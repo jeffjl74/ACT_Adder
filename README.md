@@ -48,7 +48,7 @@ Details are provided below.
 ## Download
 
 1. You might want to first read through all the steps since you will be leaving this page.
-2. To go to the download page, click the following link:
+2. To go to the download page, click the following link: [Releases Page](https://github.com/jeffjl74/ACT_Adder/releases)
 3. On the "Releases" page, click the "Assets 3" title to expand the assets (if needed). 
 The page with the expanded view will list three files.
 4. Click the "Adder.cs" link, download and save the file. 
