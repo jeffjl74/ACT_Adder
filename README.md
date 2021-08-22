@@ -54,6 +54,7 @@ The page with the expanded view will list three files.
 4. Click the "Adder.cs" link, download and save the file. 
 	* Pay attention to where the file was downloaded. 
 It will typically be in your "Downloads" folder.
+In the Chrome browser, you can select _Show in folder_ after the download to open the folder in File Explorer.
 
 
 ## Add the plugin to ACT
@@ -81,7 +82,7 @@ select it and choose either _Copy_ or _Cut_.
 
 2. Click the [Browse...] button and navigate to where you saved "Adder.cs"
    * If you moved _Adder.cs_ to the _Plugins_ folder, you can get there by entering 
-   _%appdata%\Advanced Combat Tracker\Plugins_ 
+   `%appdata%\Advanced Combat Tracker\Plugins` 
    in the File Explorer navigation bar as shown below 
 
 ![appdata](images/type-appdata.png)
