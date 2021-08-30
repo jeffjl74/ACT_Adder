@@ -26,6 +26,7 @@ namespace ACT_Adder
             this.label3 = new System.Windows.Forms.Label();
             this.textBoxSeconds = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
+            this.linkLabel1 = new System.Windows.Forms.LinkLabel();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             ((System.ComponentModel.ISupportInitialize)(this.playerBindingSource)).BeginInit();
             this.SuspendLayout();
@@ -145,8 +146,20 @@ namespace ACT_Adder
             this.label4.TabIndex = 4;
             this.label4.Text = "seconds";
             // 
+            // linkLabel1
+            // 
+            this.linkLabel1.AutoSize = true;
+            this.linkLabel1.Location = new System.Drawing.Point(4, 289);
+            this.linkLabel1.Name = "linkLabel1";
+            this.linkLabel1.Size = new System.Drawing.Size(35, 13);
+            this.linkLabel1.TabIndex = 9;
+            this.linkLabel1.TabStop = true;
+            this.linkLabel1.Text = "About";
+            this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
+            // 
             // Adder
             // 
+            this.Controls.Add(this.linkLabel1);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.textBoxSeconds);
             this.Controls.Add(this.label3);
@@ -178,5 +191,6 @@ namespace ACT_Adder
         private Label label3;
         private TextBox textBoxSeconds;
         private Label label4;
+        private LinkLabel linkLabel1;
     }
 }
