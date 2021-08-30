@@ -44,8 +44,8 @@ using System.Threading.Tasks;
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as ("1.0.*")
-[assembly: AssemblyVersion("0.9.0.0")]
-[assembly: AssemblyFileVersion("0.9.0.0")]
+[assembly: AssemblyVersion("0.9.1.0")]
+[assembly: AssemblyFileVersion("0.9.1.0")]
 #endregion Properties\AssemblyInfo.cs
 #region Adder.cs
 // reference:System.Core.dll
