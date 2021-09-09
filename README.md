@@ -13,6 +13,21 @@ To use the plugin, each player needs to do a /groupsay containing just their cou
 One (or more) player(s) also needs to do a /groupsay with the word _need_ followed by _the mob's_ count. 
 The plugin takes that information and generates a text-to-speach announcement for which two players need to be cured.
 
+Players can report their numbers in any order. A mistake can be corrected by re-doing any report, including the `/g need`.
+
+__Version 0.9.2__: 
+* The _/g need_ now accepts just an `n` or any word that starts with `n` 
+(e.g. `/g neeed 42` or `/g n 42`).
+* Fixed player table so it updates with new reports.
+* Now creates a macro `lab-macro.txt` that will /shout who to cure when
+`/do_file_commands lab-macro.txt` is used in game. 
+	* Can be used as a backup for the audio alert.
+    * Can be used to alert players that do not have this plugin.
+	* Once at least one player has reported their number and until the cures are known, 
+    the macro will do a /say of _cure not available_.
+
+
+# Example
 An example of the players reporting the numbers is shown below:
 
 Player | Action
@@ -38,6 +53,8 @@ The plugin determines the current cycle from the previous one by looking in the 
 
 The plugin must be manually downloaded and installed. 
 The steps you will be taking are:
+* __If you are updating from a previous version__, it is easiest to just use File Explorer 
+to delete the previous `Adder.cs` file (while ACT is not running).
 * Download the file from the Releases page. 
   * You will need to leave this instructions page to do so.
 * Install the downloaded file in ACT. 

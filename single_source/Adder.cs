@@ -44,8 +44,8 @@ using System.Threading.Tasks;
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as ("1.0.*")
-[assembly: AssemblyVersion("0.9.1.0")]
-[assembly: AssemblyFileVersion("0.9.1.0")]
+[assembly: AssemblyVersion("0.9.2.0")]
+[assembly: AssemblyFileVersion("0.9.2.0")]
 #endregion Properties\AssemblyInfo.cs
 #region Adder.cs
 // reference:System.Core.dll
@@ -59,12 +59,14 @@ namespace ACT_Adder
         SettingsSerializer xmlSettings;
         bool initializing = true;
 
+        string macroFile;
+
         const int logTimeStampLength = 39; //# of chars in the timestamp
         const string logTimeStampRegexStr = @"^\(\d{10}\)\[.{24}\] ";
         const string playerOrYou = @"((?<player>You)|\\aPC [^ ]+ (?<player>[^:]+):\w+\\/a) ";
         const string groupSay = playerOrYou + @"says? to the group, """;
         const string numSay = @"(?<count>\d+)""";
-        const string targetSay = @"need (?<target>\d+)""";
+        const string targetSay = @"n[^ ]* (?<target>\d+)""";
         Regex reCount = new Regex(logTimeStampRegexStr + groupSay + numSay, RegexOptions.Compiled);
         Regex reTarget = new Regex(logTimeStampRegexStr + groupSay + targetSay, RegexOptions.Compiled);
 
@@ -102,7 +104,9 @@ namespace ACT_Adder
             gridData_ = new BindingList<Player>();
             dataGridView1.DataSource = gridData;
 
-            timeWindow = new TimeSpan(0, 0, 20);
+            timeWindow = new TimeSpan(0, 0, 30);
+
+            macroFile = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, "lab-macro.txt");
 
             ActGlobals.oFormActMain.OnLogLineRead += OFormActMain_OnLogLineRead;
 
@@ -190,10 +194,10 @@ namespace ACT_Adder
             Player p = o as Player;
             if(o != null)
             {
-                Player found = gridData_.SingleOrDefault(x => x.name == p.name);
+                Player found = gridData.SingleOrDefault(x => x.name == p.name);
                 if (found == null)
                 { 
-                    gridData_.Add(p);
+                    gridData.Add(p);
                     mostRecent = p.when;
                 }
                 else
@@ -209,8 +213,9 @@ namespace ACT_Adder
                 {
                     textBoxTarget.Text = string.Empty;
                     textBoxCures.Text = string.Empty;
+                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
                 }
-                foreach (Player player in gridData_)
+                foreach (Player player in gridData)
                 {
                     if (player.when < start)
                     {
@@ -227,6 +232,7 @@ namespace ACT_Adder
         {
             textBoxTarget.Text = Need.count;
             textBoxCures.Text = string.Empty;
+            ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             SearchForTarget();
         }
 
@@ -263,6 +269,7 @@ namespace ACT_Adder
                                     ActGlobals.oFormActMain.TTS(textBoxCures.Text);
                                     announced = mostRecent;
                                     announcedTotal = added;
+                                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, textBoxCures.Text, "shout ");
                                 }
                                 break;
                             }
@@ -274,7 +281,7 @@ namespace ACT_Adder
 
         private void buttonClear_Click(object sender, EventArgs e)
         {
-            gridData_.Clear();
+            gridData.Clear();
             Need.when = DateTime.MinValue;
             announced = DateTime.MinValue;
             textBoxCures.Text = string.Empty;
@@ -519,7 +526,7 @@ namespace ACT_Adder
 
 namespace ACT_Adder
 {
-    public class Player
+    public class Player : INotifyPropertyChanged
     {
         string name_;
         string count_;
@@ -528,20 +535,28 @@ namespace ACT_Adder
 		public string name 
 		{ 
 			get { return name_; }
-			set { name_ = value; }
+			set { name_ = value; NotifyPropertyChanged("name"); }
 		}
 		public string count
 		{
 			get { return count_; }
-			set { count_ = value; }
+			set { count_ = value; NotifyPropertyChanged("count"); }
 		}
 		public DateTime when
 		{
 			get { return when_; }
-			set { when_ = value; }
+			set { when_ = value; NotifyPropertyChanged("when"); }
 		}
-		
-		public int IntCount()
+
+        public event PropertyChangedEventHandler PropertyChanged;
+
+		private void NotifyPropertyChanged(string p)
+        {
+			if (PropertyChanged != null)
+				PropertyChanged(this, new PropertyChangedEventArgs(p));
+		}
+
+        public int IntCount()
         {
 			int result;
 			int.TryParse(count, out result);
