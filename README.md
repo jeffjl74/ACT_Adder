@@ -9,22 +9,23 @@ The strategy is to cure the curse on the two players whose curse count adds up t
 
 For those players that hate math, this plugin can do the chore for them.
 
-To use the plugin, each player needs to do a /groupsay containing just their count. 
-One (or more) player(s) also needs to do a /groupsay with the word _need_ followed by _the mob's_ count. 
-The plugin takes that information and generates a text-to-speach announcement for which two players need to be cured.
+To use the plugin, each player needs to do a /groupsay (shortcut /g) containing just their count. 
+One (or more) player(s) also needs to do a /groupsay with the letter `n` 
+(or any word that stats with an `n` like `need`) followed by _the mob's_ count. 
+The plugin takes that information and generates a text-to-speach announcement 
+and a `/shout` macro for which two players need to be cured.
+
+The `/shout` macro is activated in EQII using the command `/do_file_commands lab-macro.txt`. 
+That command may itself be put in an EQII macro for placement on a hotbar.
 
 Players can report their numbers in any order. A mistake can be corrected by re-doing any report, including the `/g need`.
 
-__Version 0.9.2__: 
-* The _/g need_ now accepts just an `n` or any word that starts with `n` 
-(e.g. `/g neeed 42` or `/g n 42`).
-* Fixed player table so it updates with new reports.
-* Now creates a macro `lab-macro.txt` that will /shout who to cure when
-`/do_file_commands lab-macro.txt` is used in game. 
-	* Can be used as a backup for the audio alert.
-    * Can be used to alert players that do not have this plugin.
-	* Once at least one player has reported their number and until the cures are known, 
-    the macro will do a /say of _cure not available_.
+__Version 1.0.0__: 
+* The `/shout` macro should be more reliable.
+* Added parsing of the player's count emote when the player dies with the curse.
+ (Not sure this will capture the emote of the player using this plugin since the wording
+ of the emote is probably different and I have not seen it.)
+* Text-to-speech is disabled when importing a log file.
 
 
 # Example
@@ -35,7 +36,7 @@ Player | Action
 Player1 |/g 57
 Player2 |/g 32
 Player3 |/g 21
-Player4 |/g need 42
+Player4 |/g n 42
 Player4 |/g 54
 Player5 |/g 10
 Player6 |/g 73
@@ -44,8 +45,12 @@ The above would result in the plugin looking like this:
 
 ![Adder](images/adder.png)
 
-and the __cure Player2 and Player5__ would be announced 
-via text-to-speach as soon as the plugin finds a proper combination of numbers.
+The __cure Player2 and Player5__ is announced 
+via text-to-speach and the `/shout` macro is updated
+as soon as the plugin finds a proper combination of numbers.
+
+Between the first `/g` and discovery of a valid combination, the `/shout` macro
+does a `/say cure not available`.
 
 The plugin determines the current cycle from the previous one by looking in the _within 30 seconds_ time window.
 

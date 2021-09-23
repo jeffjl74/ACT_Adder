@@ -18,17 +18,20 @@ namespace ACT_Adder
         string settingsFile = Path.Combine(ActGlobals.oFormActMain.AppDataFolder.FullName, "Config\\Adder.config.xml");
         SettingsSerializer xmlSettings;
         bool initializing = true;
+        bool importing = false;
 
         string macroFile;
 
         const int logTimeStampLength = 39; //# of chars in the timestamp
-        const string logTimeStampRegexStr = @"^\(\d{10}\)\[.{24}\] ";
+        const string logTimeStampRegexStr = @"^\(.{36}\] ";
         const string playerOrYou = @"((?<player>You)|\\aPC [^ ]+ (?<player>[^:]+):\w+\\/a) ";
         const string groupSay = playerOrYou + @"says? to the group, """;
         const string numSay = @"(?<count>\d+)""";
         const string targetSay = @"n[^ ]* (?<target>\d+)""";
+        const string died = @"\\#FE642E(?<player>\w+) dies, taking their (?<count>\d+) increments of Wrath";
         Regex reCount = new Regex(logTimeStampRegexStr + groupSay + numSay, RegexOptions.Compiled);
         Regex reTarget = new Regex(logTimeStampRegexStr + groupSay + targetSay, RegexOptions.Compiled);
+        Regex reDied = new Regex(logTimeStampRegexStr + died, RegexOptions.Compiled);
 
         BindingList<Player> gridData_;
         public BindingList<Player> gridData { get { return gridData_; } }
@@ -75,9 +78,12 @@ namespace ACT_Adder
 
         private void OFormActMain_OnLogLineRead(bool isImport, LogLineEventArgs logInfo)
         {
+            importing = isImport;
             if (logInfo.detectedType == 0 && logInfo.logLine.Length > logTimeStampLength)
             {
                 Match match = reCount.Match(logInfo.logLine);
+                if (!match.Success)
+                    match = reDied.Match(logInfo.logLine);
                 if(match.Success)
                 {
                     Player p = new Player 
@@ -154,27 +160,29 @@ namespace ACT_Adder
             Player p = o as Player;
             if(o != null)
             {
-                Player found = gridData.SingleOrDefault(x => x.name == p.name);
-                if (found == null)
-                { 
-                    gridData.Add(p);
-                    mostRecent = p.when;
-                }
-                else
-                {
-                    found.count = p.count;
-                    found.when = p.when;
-                    mostRecent = p.when;
-                }
-
-                //remove "old" tells
-                DateTime start = mostRecent - timeWindow;
-                if (Need.when < start)
+                //remove old need
+                DateTime start = p.when - timeWindow;
+                if (Need.when < start && !string.IsNullOrEmpty(textBoxCures.Text))
                 {
                     textBoxTarget.Text = string.Empty;
                     textBoxCures.Text = string.Empty;
                     ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
                 }
+
+                // update player
+                Player found = gridData.SingleOrDefault(x => x.name == p.name);
+                if (found == null)
+                { 
+                    gridData.Add(p);
+                }
+                else
+                {
+                    found.count = p.count;
+                    found.when = p.when;
+                }
+                mostRecent = p.when;
+
+                // remove old tells
                 foreach (Player player in gridData)
                 {
                     if (player.when < start)
@@ -191,14 +199,15 @@ namespace ACT_Adder
         void UpdateTarget(object o)
         {
             textBoxTarget.Text = Need.count;
+            if (!string.IsNullOrEmpty(textBoxCures.Text))
+                ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             textBoxCures.Text = string.Empty;
-            ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             SearchForTarget();
         }
 
         // UI thread.
         // If there is a recent "need" total,
-        // add the players' numbers, 2 at a time, looking for the needed total.
+        // sum the players' numbers, two at a time, looking for the needed total.
         void SearchForTarget()
         {
             if (mostRecent != DateTime.MinValue)
@@ -224,9 +233,11 @@ namespace ACT_Adder
                                 found = true;
                                 textBoxCures.Text = "cure " + gridData_[i].name + " and " + gridData_[j].name;
                                 //only need one announcement
+                                // announce if the previous one is old, or if the total changed
                                 if (announced < start || announcedTotal != added)
                                 {
-                                    ActGlobals.oFormActMain.TTS(textBoxCures.Text);
+                                    if(!importing)
+                                        ActGlobals.oFormActMain.TTS(textBoxCures.Text);
                                     announced = mostRecent;
                                     announcedTotal = added;
                                     ActGlobals.oFormActMain.SendToMacroFile(macroFile, textBoxCures.Text, "shout ");
