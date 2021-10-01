@@ -12,23 +12,19 @@ namespace ACT_Adder
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
-            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.label1 = new System.Windows.Forms.Label();
             this.textBoxTarget = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
             this.textBoxCures = new System.Windows.Forms.TextBox();
             this.buttonClear = new System.Windows.Forms.Button();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
-            this.whenDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.nameDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.countDataGridViewTextBoxColumn = new System.Windows.Forms.DataGridViewTextBoxColumn();
-            this.playerBindingSource = new System.Windows.Forms.BindingSource(this.components);
             this.label3 = new System.Windows.Forms.Label();
             this.textBoxSeconds = new System.Windows.Forms.TextBox();
             this.label4 = new System.Windows.Forms.Label();
             this.linkLabel1 = new System.Windows.Forms.LinkLabel();
+            this.checkBoxPop = new System.Windows.Forms.CheckBox();
+            this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
-            ((System.ComponentModel.ISupportInitialize)(this.playerBindingSource)).BeginInit();
             this.SuspendLayout();
             // 
             // label1
@@ -47,6 +43,7 @@ namespace ACT_Adder
             this.textBoxTarget.Size = new System.Drawing.Size(55, 20);
             this.textBoxTarget.TabIndex = 1;
             this.textBoxTarget.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
+            this.toolTip1.SetToolTip(this.textBoxTarget, "Required total from adding two numbers");
             this.textBoxTarget.Leave += new System.EventHandler(this.textBoxTarget_Leave);
             // 
             // label2
@@ -62,16 +59,17 @@ namespace ACT_Adder
             // 
             this.textBoxCures.Location = new System.Drawing.Point(50, 242);
             this.textBoxCures.Name = "textBoxCures";
-            this.textBoxCures.Size = new System.Drawing.Size(303, 20);
+            this.textBoxCures.Size = new System.Drawing.Size(281, 20);
             this.textBoxCures.TabIndex = 6;
             // 
             // buttonClear
             // 
-            this.buttonClear.Location = new System.Drawing.Point(138, 268);
+            this.buttonClear.Location = new System.Drawing.Point(164, 268);
             this.buttonClear.Name = "buttonClear";
             this.buttonClear.Size = new System.Drawing.Size(75, 23);
             this.buttonClear.TabIndex = 7;
             this.buttonClear.Text = "Clear";
+            this.toolTip1.SetToolTip(this.buttonClear, "Clear the current data");
             this.buttonClear.UseVisualStyleBackColor = true;
             this.buttonClear.Click += new System.EventHandler(this.buttonClear_Click);
             // 
@@ -79,44 +77,11 @@ namespace ACT_Adder
             // 
             this.dataGridView1.AllowUserToAddRows = false;
             this.dataGridView1.AllowUserToDeleteRows = false;
-            this.dataGridView1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.dataGridView1.AutoGenerateColumns = false;
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            this.dataGridView1.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
-            this.whenDataGridViewTextBoxColumn,
-            this.nameDataGridViewTextBoxColumn,
-            this.countDataGridViewTextBoxColumn});
-            this.dataGridView1.DataSource = this.playerBindingSource;
             this.dataGridView1.Location = new System.Drawing.Point(0, 0);
             this.dataGridView1.Name = "dataGridView1";
-            this.dataGridView1.Size = new System.Drawing.Size(353, 210);
+            this.dataGridView1.Size = new System.Drawing.Size(399, 210);
             this.dataGridView1.TabIndex = 8;
-            // 
-            // whenDataGridViewTextBoxColumn
-            // 
-            this.whenDataGridViewTextBoxColumn.DataPropertyName = "when";
-            dataGridViewCellStyle1.Format = "h:mm:ss";
-            this.whenDataGridViewTextBoxColumn.DefaultCellStyle = dataGridViewCellStyle1;
-            this.whenDataGridViewTextBoxColumn.HeaderText = "when";
-            this.whenDataGridViewTextBoxColumn.Name = "whenDataGridViewTextBoxColumn";
-            this.whenDataGridViewTextBoxColumn.Width = 60;
-            // 
-            // nameDataGridViewTextBoxColumn
-            // 
-            this.nameDataGridViewTextBoxColumn.DataPropertyName = "name";
-            this.nameDataGridViewTextBoxColumn.HeaderText = "name";
-            this.nameDataGridViewTextBoxColumn.Name = "nameDataGridViewTextBoxColumn";
-            // 
-            // countDataGridViewTextBoxColumn
-            // 
-            this.countDataGridViewTextBoxColumn.DataPropertyName = "count";
-            this.countDataGridViewTextBoxColumn.HeaderText = "count";
-            this.countDataGridViewTextBoxColumn.Name = "countDataGridViewTextBoxColumn";
-            // 
-            // playerBindingSource
-            // 
-            this.playerBindingSource.DataSource = typeof(ACT_Adder.Player);
             // 
             // label3
             // 
@@ -155,10 +120,24 @@ namespace ACT_Adder
             this.linkLabel1.TabIndex = 9;
             this.linkLabel1.TabStop = true;
             this.linkLabel1.Text = "About";
+            this.toolTip1.SetToolTip(this.linkLabel1, "Link to the plugin description");
             this.linkLabel1.LinkClicked += new System.Windows.Forms.LinkLabelLinkClickedEventHandler(this.linkLabel1_LinkClicked);
+            // 
+            // checkBoxPop
+            // 
+            this.checkBoxPop.AutoSize = true;
+            this.checkBoxPop.Location = new System.Drawing.Point(337, 244);
+            this.checkBoxPop.Name = "checkBoxPop";
+            this.checkBoxPop.Size = new System.Drawing.Size(57, 17);
+            this.checkBoxPop.TabIndex = 10;
+            this.checkBoxPop.Text = "Popup";
+            this.toolTip1.SetToolTip(this.checkBoxPop, "Check to show pop-up window");
+            this.checkBoxPop.UseVisualStyleBackColor = true;
+            this.checkBoxPop.CheckedChanged += new System.EventHandler(this.checkBoxPop_CheckedChanged);
             // 
             // Adder
             // 
+            this.Controls.Add(this.checkBoxPop);
             this.Controls.Add(this.linkLabel1);
             this.Controls.Add(this.label4);
             this.Controls.Add(this.textBoxSeconds);
@@ -170,9 +149,8 @@ namespace ACT_Adder
             this.Controls.Add(this.textBoxTarget);
             this.Controls.Add(this.label1);
             this.Name = "Adder";
-            this.Size = new System.Drawing.Size(356, 305);
+            this.Size = new System.Drawing.Size(402, 305);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
-            ((System.ComponentModel.ISupportInitialize)(this.playerBindingSource)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -183,14 +161,12 @@ namespace ACT_Adder
         private TextBox textBoxCures;
         private Button buttonClear;
         private DataGridView dataGridView1;
-        private BindingSource playerBindingSource;
-        private System.ComponentModel.IContainer components;
-        private DataGridViewTextBoxColumn whenDataGridViewTextBoxColumn;
-        private DataGridViewTextBoxColumn nameDataGridViewTextBoxColumn;
-        private DataGridViewTextBoxColumn countDataGridViewTextBoxColumn;
         private Label label3;
         private TextBox textBoxSeconds;
         private Label label4;
         private LinkLabel linkLabel1;
+        private CheckBox checkBoxPop;
+        private ToolTip toolTip1;
+        private System.ComponentModel.IContainer components;
     }
 }

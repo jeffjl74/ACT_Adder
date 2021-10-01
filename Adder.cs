@@ -8,7 +8,13 @@ using System.Threading;
 using System.IO;
 using System.Text;
 using System.Xml;
+using System.Drawing;
+using System.Collections.Generic;
+using System.Net.Http;
+using System.Threading.Tasks;
+using System.Net.Http.Headers;
 // reference:System.Core.dll
+// reference:System.Net.http.dll
 
 namespace ACT_Adder
 {
@@ -37,6 +43,10 @@ namespace ACT_Adder
         public BindingList<Player> gridData { get { return gridData_; } }
         Player Need = new Player { count = "0", when = DateTime.MinValue, name = "Target" };
 
+        Floater floater;
+        string floatLoc = string.Empty;
+        string floatSize = string.Empty;
+
         private SynchronizationContext _synchronizationContext;
         DateTime mostRecent = DateTime.MinValue;
         TimeSpan timeWindow;
@@ -52,6 +62,9 @@ namespace ACT_Adder
         public void DeInitPlugin()
         {
             ActGlobals.oFormActMain.OnLogLineRead -= OFormActMain_OnLogLineRead;
+            floatLoc = floater.Location.ToString();
+            floatSize = floater.Size.ToString();
+            SaveSettings();
             lblStatus.Text = "Plugin Exited";
         }
 
@@ -67,13 +80,103 @@ namespace ACT_Adder
             gridData_ = new BindingList<Player>();
             dataGridView1.DataSource = gridData;
 
-            timeWindow = new TimeSpan(0, 0, 30);
+            floater = new Floater(gridData);
+            floater.GeometryEvent += Floater_GeometryEvent;
 
+            timeWindow = new TimeSpan(0, 0, 30);
+            
             macroFile = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, "lab-macro.txt");
 
             ActGlobals.oFormActMain.OnLogLineRead += OFormActMain_OnLogLineRead;
 
+            if (ActGlobals.oFormActMain.GetAutomaticUpdatesAllowed())
+            {
+                // If ACT is set to automatically check for updates, check for updates to the plugin
+                // If we don't put this on a separate thread, web latency will delay the plugin init phase
+                new Thread(new ThreadStart(oFormActMain_UpdateCheckClicked)).Start();
+            }
+
             pluginStatusText.Text = "Plugin Started";
+        }
+
+        void oFormActMain_UpdateCheckClicked()
+        {
+            try
+            {
+                Version localVersion = this.GetType().Assembly.GetName().Version;
+                Task<Version> vtask = Task.Run(() => { return GetRemoteVersionAsync(); });
+                vtask.Wait();
+                if (vtask.Result > localVersion)
+                {
+                    DialogResult result = MessageBox.Show("There is an updated version of the Adder Plugin.  Update it now?\n\n(If there is an update to ACT, you should click No and update ACT first.)", 
+                        "New Version", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
+                    if (result == DialogResult.Yes)
+                    {
+                        Task<FileInfo> ftask = Task.Run(() => { return GetRemoteFileAsync(); });
+                        ftask.Wait();
+                        if (ftask.Result != null)
+                        {
+                            ActPluginData pluginData = ActGlobals.oFormActMain.PluginGetSelfData(this);
+                            pluginData.pluginFile.Delete();
+                            File.Move(ftask.Result.FullName, pluginData.pluginFile.FullName);
+                            ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, false);
+                            Application.DoEvents();
+                            ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, true);
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ActGlobals.oFormActMain.WriteExceptionLog(ex, "Adder Plugin Update Download");
+            }
+        }
+
+        private async Task<Version> GetRemoteVersionAsync()
+        {
+            try
+            {
+                using (HttpClient client = new HttpClient())
+                {
+                    ProductInfoHeaderValue hdr = new ProductInfoHeaderValue("ACT_Adder", "1");
+                    client.DefaultRequestHeaders.UserAgent.Add(hdr);
+                    HttpResponseMessage response = await client.GetAsync(@"https://api.github.com/repos/jeffjl74/ACT_Adder/releases/latest");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        //response.EnsureSuccessStatusCode();
+                        string responseBody = await response.Content.ReadAsStringAsync();
+                        Regex reVer = new Regex(@".tag_name.:.v([^""]+)""");
+                        Match match = reVer.Match(responseBody);
+                        if (match.Success)
+                            return new Version(match.Groups[1].Value);
+                    }
+                    return new Version("0.0.0");
+                }
+            }
+            catch { return new Version("0.0.0"); }
+        }
+
+        private async Task<FileInfo> GetRemoteFileAsync()
+        {
+            try
+            {
+                using (HttpClient client = new HttpClient())
+                {
+                    ProductInfoHeaderValue hdr = new ProductInfoHeaderValue("ACT_Adder", "1");
+                    client.DefaultRequestHeaders.UserAgent.Add(hdr);
+                    HttpResponseMessage response = await client.GetAsync(@"https://github.com/jeffjl74/ACT_Adder/releases/latest/download/adder.cs");
+                    if (response.IsSuccessStatusCode)
+                    {
+                        string responseBody = await response.Content.ReadAsStringAsync();
+                        string tmp = Path.GetTempFileName();
+                        File.WriteAllText(tmp, responseBody);
+                        FileInfo fi = new FileInfo(tmp);
+                        return fi;
+                    }
+                }
+                return null;
+            }
+            catch { return null; }
         }
 
         private void OFormActMain_OnLogLineRead(bool isImport, LogLineEventArgs logInfo)
@@ -109,6 +212,9 @@ namespace ACT_Adder
         void LoadSettings()
         {
             xmlSettings.AddControlSetting(textBoxSeconds.Name, textBoxSeconds);
+            xmlSettings.AddControlSetting(checkBoxPop.Name, checkBoxPop);
+            xmlSettings.AddStringSetting("floatLoc");
+            xmlSettings.AddStringSetting("floatSize");
 
             if (File.Exists(settingsFile))
             {
@@ -158,14 +264,16 @@ namespace ACT_Adder
         void UpdatePlayer(object o)
         {
             Player p = o as Player;
-            if(o != null)
+            if(p != null)
             {
                 //remove old need
                 DateTime start = p.when - timeWindow;
                 if (Need.when < start && !string.IsNullOrEmpty(textBoxCures.Text))
                 {
                     textBoxTarget.Text = string.Empty;
+                    floater.SetNeed(string.Empty);
                     textBoxCures.Text = string.Empty;
+                    floater.SetCure(string.Empty);
                     ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
                 }
 
@@ -173,7 +281,19 @@ namespace ACT_Adder
                 Player found = gridData.SingleOrDefault(x => x.name == p.name);
                 if (found == null)
                 { 
+                    // new player
                     gridData.Add(p);
+                    dataGridView1.Columns["name"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["count"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    dataGridView1.Columns["when"].DefaultCellStyle.Format = "T";
+                    dataGridView1.Columns["when"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+                    if(checkBoxPop.Checked && floater.Visible == false)
+                    {
+                        floater.Show();
+                        floater.Location = StringToPoint(floatLoc);
+                        floater.Size = StringToSize(floatSize);
+                        floater.TopMost = true;
+                    }
                 }
                 else
                 {
@@ -199,9 +319,11 @@ namespace ACT_Adder
         void UpdateTarget(object o)
         {
             textBoxTarget.Text = Need.count;
+            floater.SetNeed(Need.count);
             if (!string.IsNullOrEmpty(textBoxCures.Text))
                 ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             textBoxCures.Text = string.Empty;
+            floater.SetCure(string.Empty);
             SearchForTarget();
         }
 
@@ -231,16 +353,20 @@ namespace ACT_Adder
                             {
                                 //found a match
                                 found = true;
-                                textBoxCures.Text = "cure " + gridData_[i].name + " and " + gridData_[j].name;
+                                string p1 = gridData_[i].name.Equals("You") ? ActGlobals.charName : gridData_[i].name;
+                                string p2 = gridData_[j].name.Equals("You") ? ActGlobals.charName : gridData_[j].name;
+                                string cure = "cure " + p1 + " and " + p2;
+                                textBoxCures.Text = cure;
+                                floater.SetCure(cure);
                                 //only need one announcement
                                 // announce if the previous one is old, or if the total changed
                                 if (announced < start || announcedTotal != added)
                                 {
                                     if(!importing)
-                                        ActGlobals.oFormActMain.TTS(textBoxCures.Text);
+                                        ActGlobals.oFormActMain.TTS(cure);
                                     announced = mostRecent;
                                     announcedTotal = added;
-                                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, textBoxCures.Text, "shout ");
+                                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, cure, "shout ");
                                 }
                                 break;
                             }
@@ -256,7 +382,9 @@ namespace ACT_Adder
             Need.when = DateTime.MinValue;
             announced = DateTime.MinValue;
             textBoxCures.Text = string.Empty;
+            floater.SetCure(string.Empty);
             textBoxTarget.Text = string.Empty;
+            floater.SetNeed(string.Empty);
         }
 
         private void textBoxSeconds_TextChanged(object sender, EventArgs e)
@@ -274,6 +402,7 @@ namespace ACT_Adder
         private void textBoxTarget_Leave(object sender, EventArgs e)
         {
             Need.count = textBoxTarget.Text;
+            floater.SetNeed(Need.count);
             SearchForTarget();
         }
 
@@ -298,5 +427,73 @@ namespace ACT_Adder
             //with a URL:
             System.Diagnostics.Process.Start("https://github.com/jeffjl74/ACT_Adder#adder-plugin-for-advanced-combat-tracker");
         }
+
+        private List<int> StringToInts(string input)
+        {
+            List<int> result = new List<int>();
+            if (!string.IsNullOrEmpty(input))
+            {
+                // remove everything that is not a digit or a comma
+                string clean = Regex.Replace(input, @"[^0-9,]+", "");
+                string[] coords = clean.Split(',');
+                for (int i = 0; i < coords.Length; i++)
+                    result.Add(int.Parse(coords[i]));
+            }
+            return result;
+        }
+
+        private Point StringToPoint(string input)
+        {
+            List<int> coords = StringToInts(input);
+            if (coords.Count == 2)
+                return new Point(coords[0], coords[1]);
+            else
+            {
+                // default location of the popup
+                // roughly center in the plugin
+                Point pt = new Point(this.Left + this.Width / 2, this.Top + this.Height / 2);
+                Point pt2 = this.ParentForm.PointToScreen(pt);
+                return pt2;
+            }
+        }
+
+        private Size StringToSize(string input)
+        {
+            List<int> coords = StringToInts(input);
+            if (coords.Count == 2)
+                return new Size(coords[0], coords[1]);
+            else
+                return new Size(200, 225); // default size of the popup
+        }
+
+        private void checkBoxPop_CheckedChanged(object sender, EventArgs e)
+        {
+            if (!initializing)
+            {
+                if (!checkBoxPop.Checked)
+                    floater.Visible = false;
+                else
+                {
+                    if (floater.Visible == false && gridData_.Count > 0)
+                    {
+                        floater.Visible = true;
+                        floater.TopMost = true;
+                    }
+                }
+            }
+        }
+
+        // save floating window size and position
+        private void Floater_GeometryEvent(object sender, EventArgs e)
+        {
+            Floater.GeometryEventArgs args = e as Floater.GeometryEventArgs;
+            if (args != null)
+            {
+                floatLoc = args.location.ToString();
+                floatSize = args.size.ToString();
+                SaveSettings();
+            }
+        }
+
     }
 }

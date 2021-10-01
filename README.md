@@ -20,12 +20,10 @@ That command may itself be put in an EQII macro for placement on a hotbar.
 
 Players can report their numbers in any order. A mistake can be corrected by re-doing any report, including the `/g need`.
 
-__Version 1.0.0__: 
-* The `/shout` macro should be more reliable.
-* Added parsing of the player's count emote when the player dies with the curse.
- (Not sure this will capture the emote of the player using this plugin since the wording
- of the emote is probably different and I have not seen it.)
-* Text-to-speech is disabled when importing a log file.
+__Version 1.1.0__: 
+* Converts 'You' in the cure message to your character name.
+* The _Popup_ checkbox enables an optional popup window with the cure information.
+* If there are any future revisions, they can be automatically downloaded.
 
 
 # Example
@@ -33,19 +31,19 @@ An example of the players reporting the numbers is shown below:
 
 Player | Action
 -------|-------
-Player1 |/g 57
-Player2 |/g 32
-Player3 |/g 21
-Player4 |/g n 42
-Player4 |/g 54
-Player5 |/g 10
-Player6 |/g 73
+Player1 |/g 58
+Player2 |/g 33
+Player3 |/g 22
+Player4 |/g n 69
+Player4 |/g 55
+Player5 |/g 11
+Player6 |/g 74
 
 The above would result in the plugin looking like this:
 
 ![Adder](images/adder.png)
 
-The __cure Player2 and Player5__ is announced 
+The __cure Player1 and Player5__ is announced 
 via text-to-speach and the `/shout` macro is updated
 as soon as the plugin finds a proper combination of numbers.
 

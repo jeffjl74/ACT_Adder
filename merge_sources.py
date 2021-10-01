@@ -5,6 +5,7 @@ from typing import OrderedDict
 
 files = ['Properties\\AssemblyInfo.cs', 'Adder.cs', 'Adder.Designer.cs']
 files.extend(['Player.cs'])
+files.extend(['Floater.cs', 'Floater.Designer.cs'])
 
 merged = []
 usings = []
@@ -18,7 +19,7 @@ for fn in files:
   found_ns_bracket = False
   first_line = True
   f = open(fn, 'r', encoding="utf8")
-  merged.append('#region ' + fn + '\n')
+  merged.append('\n#region ' + fn + '\n')
   linenum = 0
   for ln in f:
     linenum += 1
@@ -37,7 +38,7 @@ for fn in files:
       merged.append(ln)
 
   f.close()
-  merged.append('#endregion ' + fn + '\n')
+  merged.append('\n#endregion ' + fn + '\n')
 
 # merge the usings, remove duplicates
 nodups = list(OrderedDict.fromkeys(usings))

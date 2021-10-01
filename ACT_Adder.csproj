@@ -52,12 +52,21 @@
     <Compile Include="Adder.Designer.cs">
       <DependentUpon>Adder.cs</DependentUpon>
     </Compile>
+    <Compile Include="Floater.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Floater.Designer.cs">
+      <DependentUpon>Floater.cs</DependentUpon>
+    </Compile>
     <Compile Include="Player.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Adder.resx">
       <DependentUpon>Adder.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Floater.resx">
+      <DependentUpon>Floater.cs</DependentUpon>
     </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
