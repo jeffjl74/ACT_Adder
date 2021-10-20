@@ -60,6 +60,12 @@
     </Compile>
     <Compile Include="Player.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="TextBoxX.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="TextBoxX.Designer.cs">
+      <DependentUpon>TextBoxX.cs</DependentUpon>
+    </Compile>
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Adder.resx">

@@ -82,6 +82,7 @@ namespace ACT_Adder
 
             floater = new Floater(gridData);
             floater.GeometryEvent += Floater_GeometryEvent;
+            floater.ClearEvent += Floater_ClearEvent;
 
             timeWindow = new TimeSpan(0, 0, 30);
             
@@ -318,6 +319,7 @@ namespace ACT_Adder
         // UI thread
         void UpdateTarget(object o)
         {
+            mostRecent = Need.when;
             textBoxTarget.Text = Need.count;
             floater.SetNeed(Need.count);
             if (!string.IsNullOrEmpty(textBoxCures.Text))
@@ -342,14 +344,15 @@ namespace ACT_Adder
                     bool found = false;
                     for(int i = 0; i< playerCount && !found; i++)
                     {
-                        if (gridData_[i].when < start)
-                            continue;
                         int outerCount = gridData_[i].IntCount();
+                        if (gridData_[i].when < start || outerCount == 0)
+                            continue;
                         for(int j=i+1; j<playerCount; j++)
                         {
-                            if (gridData_[j].when < start)
+                            int innerCount = gridData_[j].IntCount();
+                            if (gridData_[j].when < start || innerCount == 0)
                                 continue;
-                            if (gridData_[j].IntCount() + outerCount == added)
+                            if (innerCount + outerCount == added)
                             {
                                 //found a match
                                 found = true;
@@ -358,9 +361,9 @@ namespace ACT_Adder
                                 string cure = "cure " + p1 + " and " + p2;
                                 textBoxCures.Text = cure;
                                 floater.SetCure(cure);
-                                //only need one announcement
-                                // announce if the previous one is old, or if the total changed
-                                if (announced < start || announcedTotal != added)
+                                // only need one announcement
+                                // announce if the previous one is old, or if the total changed (i.e. a corrected 'need')
+                                if (announced < start || (announced >= start && announcedTotal != added))
                                 {
                                     if(!importing)
                                         ActGlobals.oFormActMain.TTS(cure);
@@ -474,9 +477,11 @@ namespace ACT_Adder
                     floater.Visible = false;
                 else
                 {
-                    if (floater.Visible == false && gridData_.Count > 0)
+                    if (floater.Visible == false)
                     {
-                        floater.Visible = true;
+                        floater.Show();
+                        floater.Location = StringToPoint(floatLoc);
+                        floater.Size = StringToSize(floatSize);
                         floater.TopMost = true;
                     }
                 }
@@ -495,5 +500,26 @@ namespace ACT_Adder
             }
         }
 
+        private void Floater_ClearEvent(object sender, EventArgs e)
+        {
+            buttonClear_Click(sender, e);
+        }
+
+        private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e != null)
+            {
+                if (e.RowIndex >= 0 && e.ColumnIndex == dataGridView1.Columns["count"].Index)
+                {
+                    if (e.Value != null)
+                    {
+                        if (string.IsNullOrEmpty(e.Value.ToString()))
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Red;
+                        else
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Black;
+                    }
+                }
+            }
+        }
     }
 }

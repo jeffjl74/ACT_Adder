@@ -6,6 +6,7 @@ from typing import OrderedDict
 files = ['Properties\\AssemblyInfo.cs', 'Adder.cs', 'Adder.Designer.cs']
 files.extend(['Player.cs'])
 files.extend(['Floater.cs', 'Floater.Designer.cs'])
+files.extend(['TextBoxX.cs', 'TextBoxX.Designer.cs'])
 
 merged = []
 usings = []

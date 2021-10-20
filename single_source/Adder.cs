@@ -16,7 +16,6 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
-using System.Data;
 
 #region Properties\AssemblyInfo.cs
 
@@ -49,8 +48,8 @@ using System.Data;
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as ("1.0.*")
-[assembly: AssemblyVersion("1.1.0.0")]
-[assembly: AssemblyFileVersion("1.1.0.0")]
+[assembly: AssemblyVersion("1.2.0.0")]
+[assembly: AssemblyFileVersion("1.2.0.0")]
 
 #endregion Properties\AssemblyInfo.cs
 
@@ -124,6 +123,7 @@ namespace ACT_Adder
 
             floater = new Floater(gridData);
             floater.GeometryEvent += Floater_GeometryEvent;
+            floater.ClearEvent += Floater_ClearEvent;
 
             timeWindow = new TimeSpan(0, 0, 30);
             
@@ -360,6 +360,7 @@ namespace ACT_Adder
         // UI thread
         void UpdateTarget(object o)
         {
+            mostRecent = Need.when;
             textBoxTarget.Text = Need.count;
             floater.SetNeed(Need.count);
             if (!string.IsNullOrEmpty(textBoxCures.Text))
@@ -384,14 +385,15 @@ namespace ACT_Adder
                     bool found = false;
                     for(int i = 0; i< playerCount && !found; i++)
                     {
-                        if (gridData_[i].when < start)
-                            continue;
                         int outerCount = gridData_[i].IntCount();
+                        if (gridData_[i].when < start || outerCount == 0)
+                            continue;
                         for(int j=i+1; j<playerCount; j++)
                         {
-                            if (gridData_[j].when < start)
+                            int innerCount = gridData_[j].IntCount();
+                            if (gridData_[j].when < start || innerCount == 0)
                                 continue;
-                            if (gridData_[j].IntCount() + outerCount == added)
+                            if (innerCount + outerCount == added)
                             {
                                 //found a match
                                 found = true;
@@ -400,9 +402,9 @@ namespace ACT_Adder
                                 string cure = "cure " + p1 + " and " + p2;
                                 textBoxCures.Text = cure;
                                 floater.SetCure(cure);
-                                //only need one announcement
-                                // announce if the previous one is old, or if the total changed
-                                if (announced < start || announcedTotal != added)
+                                // only need one announcement
+                                // announce if the previous one is old, or if the total changed (i.e. a corrected 'need')
+                                if (announced < start || (announced >= start && announcedTotal != added))
                                 {
                                     if(!importing)
                                         ActGlobals.oFormActMain.TTS(cure);
@@ -516,9 +518,11 @@ namespace ACT_Adder
                     floater.Visible = false;
                 else
                 {
-                    if (floater.Visible == false && gridData_.Count > 0)
+                    if (floater.Visible == false)
                     {
-                        floater.Visible = true;
+                        floater.Show();
+                        floater.Location = StringToPoint(floatLoc);
+                        floater.Size = StringToSize(floatSize);
                         floater.TopMost = true;
                     }
                 }
@@ -537,6 +541,27 @@ namespace ACT_Adder
             }
         }
 
+        private void Floater_ClearEvent(object sender, EventArgs e)
+        {
+            buttonClear_Click(sender, e);
+        }
+
+        private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if (e != null)
+            {
+                if (e.RowIndex >= 0 && e.ColumnIndex == dataGridView1.Columns["count"].Index)
+                {
+                    if (e.Value != null)
+                    {
+                        if (string.IsNullOrEmpty(e.Value.ToString()))
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Red;
+                        else
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Black;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -551,6 +576,7 @@ namespace ACT_Adder
         private void InitializeComponent()
         {
             this.components = new System.ComponentModel.Container();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.label1 = new System.Windows.Forms.Label();
             this.textBoxTarget = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
@@ -616,11 +642,24 @@ namespace ACT_Adder
             // 
             this.dataGridView1.AllowUserToAddRows = false;
             this.dataGridView1.AllowUserToDeleteRows = false;
+            this.dataGridView1.AllowUserToResizeRows = false;
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dataGridView1.DefaultCellStyle = dataGridViewCellStyle1;
             this.dataGridView1.Location = new System.Drawing.Point(0, 0);
+            this.dataGridView1.MultiSelect = false;
             this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.ReadOnly = true;
             this.dataGridView1.Size = new System.Drawing.Size(399, 210);
             this.dataGridView1.TabIndex = 8;
+            this.dataGridView1.TabStop = false;
+            this.dataGridView1.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridView1_CellFormatting);
             // 
             // label3
             // 
@@ -770,6 +809,7 @@ namespace ACT_Adder
     {
         BindingList<Player> data_;
 
+        public event EventHandler ClearEvent;
         public event EventHandler GeometryEvent;
         public class GeometryEventArgs : EventArgs
         {
@@ -787,7 +827,9 @@ namespace ACT_Adder
         {
             dataGridView1.DataSource = data_;
             dataGridView1.Columns["when"].Visible = false;
+            dataGridView1.Columns["name"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             dataGridView1.Columns["count"].Width = 40;
+            TopMost = true;
         }
 
         // just hide (not close) if user presses the [X]
@@ -821,6 +863,31 @@ namespace ACT_Adder
             {
                 GeometryEventArgs args = new GeometryEventArgs { size = this.Size, location = this.Location };
                 GeometryEvent.Invoke(this, args);
+            }
+        }
+
+        // tell the main form to clear the data
+        private void textBoxCure_ClickX(object sender, EventArgs e)
+        {
+            if (ClearEvent != null)
+                ClearEvent.Invoke(this, new EventArgs());
+        }
+
+        // red text for players that have not reported
+        private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if(e != null)
+            {
+                if(e.RowIndex >= 0 && e.ColumnIndex == dataGridView1.Columns["count"].Index)
+                {
+                    if(e.Value != null)
+                    {
+                        if (string.IsNullOrEmpty(e.Value.ToString()))
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Red;
+                        else
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Black;
+                    }
+                }
             }
         }
     }
@@ -860,10 +927,11 @@ namespace ACT_Adder
         /// </summary>
         private void InitializeComponent()
         {
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
-            this.textBoxCure = new System.Windows.Forms.TextBox();
             this.panel1 = new System.Windows.Forms.Panel();
             this.panel2 = new System.Windows.Forms.Panel();
+            this.textBoxCure = new ACT_Adder.TextBoxX();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.panel1.SuspendLayout();
             this.panel2.SuspendLayout();
@@ -873,26 +941,27 @@ namespace ACT_Adder
             // 
             this.dataGridView1.AllowUserToAddRows = false;
             this.dataGridView1.AllowUserToDeleteRows = false;
+            this.dataGridView1.AllowUserToResizeRows = false;
             this.dataGridView1.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView1.ColumnHeadersVisible = false;
+            dataGridViewCellStyle1.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle1.BackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle1.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle1.ForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.SelectionBackColor = System.Drawing.SystemColors.Window;
+            dataGridViewCellStyle1.SelectionForeColor = System.Drawing.SystemColors.ControlText;
+            dataGridViewCellStyle1.WrapMode = System.Windows.Forms.DataGridViewTriState.False;
+            this.dataGridView1.DefaultCellStyle = dataGridViewCellStyle1;
             this.dataGridView1.Dock = System.Windows.Forms.DockStyle.Fill;
             this.dataGridView1.Location = new System.Drawing.Point(0, 0);
+            this.dataGridView1.MultiSelect = false;
             this.dataGridView1.Name = "dataGridView1";
+            this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersVisible = false;
-            this.dataGridView1.Size = new System.Drawing.Size(166, 159);
+            this.dataGridView1.Size = new System.Drawing.Size(166, 165);
             this.dataGridView1.TabIndex = 0;
-            // 
-            // textBoxCure
-            // 
-            this.textBoxCure.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
-            | System.Windows.Forms.AnchorStyles.Right)));
-            this.textBoxCure.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
-            this.textBoxCure.ForeColor = System.Drawing.SystemColors.ControlText;
-            this.textBoxCure.Location = new System.Drawing.Point(3, 3);
-            this.textBoxCure.Name = "textBoxCure";
-            this.textBoxCure.ReadOnly = true;
-            this.textBoxCure.Size = new System.Drawing.Size(158, 20);
-            this.textBoxCure.TabIndex = 1;
-            this.textBoxCure.TabStop = false;
+            this.dataGridView1.TabStop = false;
+            this.dataGridView1.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridView1_CellFormatting);
             // 
             // panel1
             // 
@@ -900,17 +969,30 @@ namespace ACT_Adder
             this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(166, 26);
+            this.panel1.Size = new System.Drawing.Size(166, 20);
             this.panel1.TabIndex = 2;
             // 
             // panel2
             // 
             this.panel2.Controls.Add(this.dataGridView1);
             this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panel2.Location = new System.Drawing.Point(0, 26);
+            this.panel2.Location = new System.Drawing.Point(0, 20);
             this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(166, 159);
+            this.panel2.Size = new System.Drawing.Size(166, 165);
             this.panel2.TabIndex = 3;
+            // 
+            // textBoxCure
+            // 
+            this.textBoxCure.ButtonTextClear = true;
+            this.textBoxCure.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.textBoxCure.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            this.textBoxCure.Location = new System.Drawing.Point(0, 0);
+            this.textBoxCure.Name = "textBoxCure";
+            this.textBoxCure.ReadOnly = true;
+            this.textBoxCure.Size = new System.Drawing.Size(166, 20);
+            this.textBoxCure.TabIndex = 0;
+            this.textBoxCure.TabStop = false;
+            this.textBoxCure.ClickX += new System.EventHandler(this.textBoxCure_ClickX);
             // 
             // Floater
             // 
@@ -939,9 +1021,114 @@ namespace ACT_Adder
         #endregion
 
         private System.Windows.Forms.DataGridView dataGridView1;
-        private System.Windows.Forms.TextBox textBoxCure;
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel panel2;
+        private TextBoxX textBoxCure;
     }
 }
 #endregion Floater.Designer.cs
+
+#region TextBoxX.cs
+
+namespace ACT_Adder
+{
+    public partial class TextBoxX : TextBox
+    {
+        private readonly Label lblClear;
+
+        // new event handler for the X "button"
+        [Browsable(true)]
+        [Category("Action")]
+        [Description("Invoked when user clicks X")]
+        public event EventHandler ClickX;
+
+        // required TextBox stuff
+        public bool ButtonTextClear { get; set; }
+        public AutoScaleMode AutoScaleMode;
+
+        public TextBoxX()
+        {
+            InitializeComponent();
+
+            ButtonTextClear = true;
+
+            Resize += PositionX;
+
+            lblClear = new Label()
+            {
+                Location = new Point(100, 0),
+                AutoSize = true,
+                Text = " x ",
+                ForeColor = Color.Gray,
+                Font = new Font("Tahoma", 8.25F),
+                Cursor = Cursors.Arrow
+            };
+
+            Controls.Add(lblClear);
+            lblClear.Click += LblClear_Click;
+            lblClear.BringToFront();
+        }
+
+        private void LblClear_Click(object sender, EventArgs e)
+        {
+            Text = string.Empty; 
+            ButtonX_Click(sender, e);
+        }
+
+        protected void ButtonX_Click(object sender, EventArgs e)
+        {
+            // report the event to the parent
+            if (ClickX != null)
+                ClickX(this, e);
+        }
+
+        private void PositionX(object sender, EventArgs e)
+        { 
+            lblClear.Location = new Point(Width - lblClear.Width, ((Height - lblClear.Height) / 2) - 1); 
+        }
+    }
+}
+
+#endregion TextBoxX.cs
+
+#region TextBoxX.Designer.cs
+
+namespace ACT_Adder
+{
+    partial class TextBoxX
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            components = new System.ComponentModel.Container();
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+        }
+
+        #endregion
+    }
+}
+
+#endregion TextBoxX.Designer.cs

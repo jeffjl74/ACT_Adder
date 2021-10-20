@@ -1,11 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.ComponentModel;
-using System.Data;
 using System.Drawing;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
 
 namespace ACT_Adder
@@ -14,6 +9,7 @@ namespace ACT_Adder
     {
         BindingList<Player> data_;
 
+        public event EventHandler ClearEvent;
         public event EventHandler GeometryEvent;
         public class GeometryEventArgs : EventArgs
         {
@@ -31,7 +27,9 @@ namespace ACT_Adder
         {
             dataGridView1.DataSource = data_;
             dataGridView1.Columns["when"].Visible = false;
+            dataGridView1.Columns["name"].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
             dataGridView1.Columns["count"].Width = 40;
+            TopMost = true;
         }
 
         // just hide (not close) if user presses the [X]
@@ -65,6 +63,31 @@ namespace ACT_Adder
             {
                 GeometryEventArgs args = new GeometryEventArgs { size = this.Size, location = this.Location };
                 GeometryEvent.Invoke(this, args);
+            }
+        }
+
+        // tell the main form to clear the data
+        private void textBoxCure_ClickX(object sender, EventArgs e)
+        {
+            if (ClearEvent != null)
+                ClearEvent.Invoke(this, new EventArgs());
+        }
+
+        // red text for players that have not reported
+        private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
+        {
+            if(e != null)
+            {
+                if(e.RowIndex >= 0 && e.ColumnIndex == dataGridView1.Columns["count"].Index)
+                {
+                    if(e.Value != null)
+                    {
+                        if (string.IsNullOrEmpty(e.Value.ToString()))
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Red;
+                        else
+                            dataGridView1.Rows[e.RowIndex].Cells["name"].Style.ForeColor = Color.Black;
+                    }
+                }
             }
         }
     }

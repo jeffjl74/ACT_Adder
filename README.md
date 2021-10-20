@@ -20,10 +20,11 @@ That command may itself be put in an EQII macro for placement on a hotbar.
 
 Players can report their numbers in any order. A mistake can be corrected by re-doing any report, including the `/g need`.
 
-__Version 1.1.0__: 
-* Converts 'You' in the cure message to your character name.
-* The _Popup_ checkbox enables an optional popup window with the cure information.
-* If there are any future revisions, they can be automatically downloaded.
+__Version 1.2.0__: 
+* Fix occasional improper announcements when the `need` number is the first group tell of a new sequence.
+* Added an X at the end of the popup text box to provide the same function as the [Clear] button on the plugin tab page.
+* Toggling the popup checkbox now toggles the popup display visibility even if there is no data to display.
+* Players that have not yet reported their number for the current cycle are now colored red.
 
 
 # Example
@@ -43,6 +44,10 @@ The above would result in the plugin looking like this:
 
 ![Adder](images/adder.png)
 
+and the popup (if enabled) looking like this:
+
+![Popup](images/popup.png)
+
 The __cure Player1 and Player5__ is announced 
 via text-to-speach and the `/shout` macro is updated
 as soon as the plugin finds a proper combination of numbers.
@@ -54,9 +59,11 @@ The plugin determines the current cycle from the previous one by looking in the 
 
 # Installation
 
-The plugin must be manually downloaded and installed. 
+If you already have version 1.1 or newer installed and enabled, 
+you will get a prompt to update to the latest version when you run ACT.
+Otherwise, the plugin must be manually downloaded and installed. 
 The steps you will be taking are:
-* __If you are updating from a previous version__, it is easiest to just use File Explorer 
+* __If you are updating from a version prior to 1.1__, it is easiest to just use File Explorer 
 to delete the previous `Adder.cs` file (while ACT is not running).
 * Download the file from the Releases page. 
   * You will need to leave this instructions page to do so.
