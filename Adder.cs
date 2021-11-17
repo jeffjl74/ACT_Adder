@@ -26,8 +26,6 @@ namespace ACT_Adder
         bool initializing = true;
         bool importing = false;
 
-        string macroFile;
-
         const int logTimeStampLength = 39; //# of chars in the timestamp
         const string logTimeStampRegexStr = @"^\(.{36}\] ";
         const string playerOrYou = @"((?<player>You)|\\aPC [^ ]+ (?<player>[^:]+):\w+\\/a) ";
@@ -35,9 +33,11 @@ namespace ACT_Adder
         const string numSay = @"(?<count>\d+)""";
         const string targetSay = @"n[^ ]* (?<target>\d+)""";
         const string died = @"\\#FE642E(?<player>\w+) dies, taking their (?<count>\d+) increments of Wrath";
+        const string numbers = @"\\aNPC \d+ The Abandoned Labomination:The Abandoned Labomination\\/a says, .Nuuuummmm";
         Regex reCount = new Regex(logTimeStampRegexStr + groupSay + numSay, RegexOptions.Compiled);
         Regex reTarget = new Regex(logTimeStampRegexStr + groupSay + targetSay, RegexOptions.Compiled);
         Regex reDied = new Regex(logTimeStampRegexStr + died, RegexOptions.Compiled);
+        Regex reWinStart = new Regex(logTimeStampRegexStr + numbers, RegexOptions.Compiled);
 
         BindingList<Player> gridData_;
         public BindingList<Player> gridData { get { return gridData_; } }
@@ -46,12 +46,20 @@ namespace ACT_Adder
         Floater floater;
         string floatLoc = string.Empty;
         string floatSize = string.Empty;
+        bool floaterShown = false;
 
         private SynchronizationContext _synchronizationContext;
         DateTime mostRecent = DateTime.MinValue;
         TimeSpan timeWindow;
         DateTime announced = DateTime.MinValue;
         int announcedTotal = -1;
+
+        string macroFilePath;
+        string curesFilePath;
+        const string shoutMacroFile = "lab-macro.txt";
+        const string curesMacroFile = "lab-cures.txt";
+        string cureFormat = @"useabilityonplayer ""{0}"" Cure Curse ;g curing {1}";
+        string undeterminedCure = "cure not available";
 
         public Adder()
         {
@@ -62,8 +70,11 @@ namespace ACT_Adder
         public void DeInitPlugin()
         {
             ActGlobals.oFormActMain.OnLogLineRead -= OFormActMain_OnLogLineRead;
-            floatLoc = floater.Location.ToString();
-            floatSize = floater.Size.ToString();
+            if (floaterShown)
+            {
+                floatLoc = floater.Location.ToString();
+                floatSize = floater.Size.ToString();
+            }
             SaveSettings();
             lblStatus.Text = "Plugin Exited";
         }
@@ -73,6 +84,7 @@ namespace ACT_Adder
             lblStatus = pluginStatusText;           // Save the status label's reference
             pluginScreenSpace.Controls.Add(this);   // Add this UserControl to the tab ACT provides
             this.Dock = DockStyle.Fill;             // Expand the UserControl to fill the tab's client space
+
             xmlSettings = new SettingsSerializer(this); // Create a new settings serializer and pass it this instance
             LoadSettings();
             initializing = false;
@@ -84,9 +96,11 @@ namespace ACT_Adder
             floater.GeometryEvent += Floater_GeometryEvent;
             floater.ClearEvent += Floater_ClearEvent;
 
-            timeWindow = new TimeSpan(0, 0, 30);
-            
-            macroFile = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, "lab-macro.txt");
+            SetTimeWindow();
+
+            macroFilePath = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, shoutMacroFile);
+            curesFilePath = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, curesMacroFile);
+            SetMacroHelp();
 
             ActGlobals.oFormActMain.OnLogLineRead += OFormActMain_OnLogLineRead;
 
@@ -109,7 +123,7 @@ namespace ACT_Adder
                 vtask.Wait();
                 if (vtask.Result > localVersion)
                 {
-                    DialogResult result = MessageBox.Show("There is an updated version of the Adder Plugin.  Update it now?\n\n(If there is an update to ACT, you should click No and update ACT first.)", 
+                    DialogResult result = MessageBox.Show("There is an updated version of the Adder Plugin.\n\nSee the changes by clicking the About link in the plugin.\n\nUpdate it now?\n\n(If there is an update to ACT, you should click No and update ACT first.)", 
                         "New Version", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result == DialogResult.Yes)
                     {
@@ -120,6 +134,7 @@ namespace ACT_Adder
                             ActPluginData pluginData = ActGlobals.oFormActMain.PluginGetSelfData(this);
                             pluginData.pluginFile.Delete();
                             File.Move(ftask.Result.FullName, pluginData.pluginFile.FullName);
+                            Application.DoEvents();
                             ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, false);
                             Application.DoEvents();
                             ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, true);
@@ -207,9 +222,16 @@ namespace ACT_Adder
                         Need.when = logInfo.detectedTime;
                         _synchronizationContext.Post(UpdateTarget, null);
                     }
+                    else
+                    {
+                        match = reWinStart.Match(logInfo.logLine);
+                        if (match.Success)
+                            _synchronizationContext.Send(StartCountdown, null);
+                    }
                 }
             }
         }
+
         void LoadSettings()
         {
             xmlSettings.AddControlSetting(textBoxSeconds.Name, textBoxSeconds);
@@ -261,21 +283,44 @@ namespace ACT_Adder
             xWriter.Close();
         }
 
+        private void SetMacroHelp()
+        {
+            dataGridView2.Rows.Add("cure players", "/do_file_commands " + curesMacroFile);
+            dataGridView2.Rows.Add("shout cures", "/do_file_commands " + shoutMacroFile);
+            dataGridView2.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView2.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            // set the height of the dgv from the number of rows
+            int height = dataGridView2.ColumnHeadersHeight - 1;
+            foreach (DataGridViewRow dr in dataGridView2.Rows)
+            {
+                height += dr.Height;
+            }
+            dataGridView2.Height = height;
+        }
+
+        // UI thread
+        void StartCountdown(object o)
+        {
+            ActGlobals.oFormActMain.SendToMacroFile(macroFilePath, undeterminedCure, "say ");
+            ActGlobals.oFormActMain.SendToMacroFile(curesFilePath, undeterminedCure, "g");
+            progressControl1.StartProgress();
+            floater.StartProgress();
+        }
+
         // UI thread
         void UpdatePlayer(object o)
         {
             Player p = o as Player;
             if(p != null)
             {
-                //remove old need
                 DateTime start = p.when - timeWindow;
+                //remove old need?
                 if (Need.when < start && !string.IsNullOrEmpty(textBoxCures.Text))
                 {
                     textBoxTarget.Text = string.Empty;
                     floater.SetNeed(string.Empty);
                     textBoxCures.Text = string.Empty;
                     floater.SetCure(string.Empty);
-                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
                 }
 
                 // update player
@@ -289,12 +334,7 @@ namespace ACT_Adder
                     dataGridView1.Columns["when"].DefaultCellStyle.Format = "T";
                     dataGridView1.Columns["when"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
                     if(checkBoxPop.Checked && floater.Visible == false)
-                    {
-                        floater.Show();
-                        floater.Location = StringToPoint(floatLoc);
-                        floater.Size = StringToSize(floatSize);
-                        floater.TopMost = true;
-                    }
+                        ShowFloater();
                 }
                 else
                 {
@@ -316,16 +356,25 @@ namespace ACT_Adder
             }
         }
 
+        private void ShowFloater()
+        {
+            floater.Show();
+            floaterShown = true;
+            floater.Location = StringToPoint(floatLoc);
+            floater.Size = StringToSize(floatSize);
+            floater.TopMost = true;
+        }
+
         // UI thread
         void UpdateTarget(object o)
         {
             mostRecent = Need.when;
             textBoxTarget.Text = Need.count;
             floater.SetNeed(Need.count);
-            if (!string.IsNullOrEmpty(textBoxCures.Text))
-                ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             textBoxCures.Text = string.Empty;
             floater.SetCure(string.Empty);
+            if (checkBoxPop.Checked && floater.Visible == false)
+                ShowFloater();
             SearchForTarget();
         }
 
@@ -346,12 +395,12 @@ namespace ACT_Adder
                     {
                         int outerCount = gridData_[i].IntCount();
                         if (gridData_[i].when < start || outerCount == 0)
-                            continue;
+                            continue; // skip anyone who has not reported
                         for(int j=i+1; j<playerCount; j++)
                         {
                             int innerCount = gridData_[j].IntCount();
                             if (gridData_[j].when < start || innerCount == 0)
-                                continue;
+                                continue; // skip anyone who has not reported
                             if (innerCount + outerCount == added)
                             {
                                 //found a match
@@ -369,7 +418,11 @@ namespace ACT_Adder
                                         ActGlobals.oFormActMain.TTS(cure);
                                     announced = mostRecent;
                                     announcedTotal = added;
-                                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, cure, "shout ");
+                                    ActGlobals.oFormActMain.SendToMacroFile(macroFilePath, cure, "shout ");
+                                    ActGlobals.oFormActMain.SendToMacroFile(curesFilePath, 
+                                        "cancel_spellcast" + Environment.NewLine
+                                        + string.Format(cureFormat, p1, p1) + Environment.NewLine 
+                                        + string.Format(cureFormat, p2, p2), "");
                                 }
                                 break;
                             }
@@ -388,18 +441,27 @@ namespace ACT_Adder
             floater.SetCure(string.Empty);
             textBoxTarget.Text = string.Empty;
             floater.SetNeed(string.Empty);
+            progressControl1.ClearProgress();
+            floater.StopProgress();
         }
 
         private void textBoxSeconds_TextChanged(object sender, EventArgs e)
         {
             if (!initializing)
             {
-                int secs;
-                if (!int.TryParse(textBoxSeconds.Text, out secs))
-                    secs = 20;
-                timeWindow = new TimeSpan(0, 0, secs);
+                SetTimeWindow();
                 SaveSettings();
             }
+        }
+
+        private void SetTimeWindow()
+        {
+            int secs;
+            if (!int.TryParse(textBoxSeconds.Text, out secs))
+                secs = 30;
+            timeWindow = new TimeSpan(0, 0, secs);
+            progressControl1.ProgressMaximum = secs;
+            floater.SetProgressMax(secs);
         }
 
         private void textBoxTarget_Leave(object sender, EventArgs e)
@@ -479,10 +541,7 @@ namespace ACT_Adder
                 {
                     if (floater.Visible == false)
                     {
-                        floater.Show();
-                        floater.Location = StringToPoint(floatLoc);
-                        floater.Size = StringToSize(floatSize);
-                        floater.TopMost = true;
+                        ShowFloater();
                     }
                 }
             }
@@ -503,6 +562,7 @@ namespace ACT_Adder
         private void Floater_ClearEvent(object sender, EventArgs e)
         {
             buttonClear_Click(sender, e);
+            progressControl1.ClearProgress();
         }
 
         private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)

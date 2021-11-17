@@ -16,6 +16,7 @@ using System.Collections.Generic;
 using System.Net.Http;
 using System.Threading.Tasks;
 using System.Net.Http.Headers;
+using System.Drawing.Text;
 
 #region Properties\AssemblyInfo.cs
 
@@ -48,8 +49,8 @@ using System.Net.Http.Headers;
 //
 // You can specify all the values or you can default the Build and Revision Numbers
 // by using the '*' as ("1.0.*")
-[assembly: AssemblyVersion("1.2.0.0")]
-[assembly: AssemblyFileVersion("1.2.0.0")]
+[assembly: AssemblyVersion("1.3.0.0")]
+[assembly: AssemblyFileVersion("1.3.0.0")]
 
 #endregion Properties\AssemblyInfo.cs
 
@@ -67,8 +68,6 @@ namespace ACT_Adder
         bool initializing = true;
         bool importing = false;
 
-        string macroFile;
-
         const int logTimeStampLength = 39; //# of chars in the timestamp
         const string logTimeStampRegexStr = @"^\(.{36}\] ";
         const string playerOrYou = @"((?<player>You)|\\aPC [^ ]+ (?<player>[^:]+):\w+\\/a) ";
@@ -76,9 +75,11 @@ namespace ACT_Adder
         const string numSay = @"(?<count>\d+)""";
         const string targetSay = @"n[^ ]* (?<target>\d+)""";
         const string died = @"\\#FE642E(?<player>\w+) dies, taking their (?<count>\d+) increments of Wrath";
+        const string numbers = @"\\aNPC \d+ The Abandoned Labomination:The Abandoned Labomination\\/a says, .Nuuuummmm";
         Regex reCount = new Regex(logTimeStampRegexStr + groupSay + numSay, RegexOptions.Compiled);
         Regex reTarget = new Regex(logTimeStampRegexStr + groupSay + targetSay, RegexOptions.Compiled);
         Regex reDied = new Regex(logTimeStampRegexStr + died, RegexOptions.Compiled);
+        Regex reWinStart = new Regex(logTimeStampRegexStr + numbers, RegexOptions.Compiled);
 
         BindingList<Player> gridData_;
         public BindingList<Player> gridData { get { return gridData_; } }
@@ -87,12 +88,20 @@ namespace ACT_Adder
         Floater floater;
         string floatLoc = string.Empty;
         string floatSize = string.Empty;
+        bool floaterShown = false;
 
         private SynchronizationContext _synchronizationContext;
         DateTime mostRecent = DateTime.MinValue;
         TimeSpan timeWindow;
         DateTime announced = DateTime.MinValue;
         int announcedTotal = -1;
+
+        string macroFilePath;
+        string curesFilePath;
+        const string shoutMacroFile = "lab-macro.txt";
+        const string curesMacroFile = "lab-cures.txt";
+        string cureFormat = @"useabilityonplayer ""{0}"" Cure Curse ;g curing {1}";
+        string undeterminedCure = "cure not available";
 
         public Adder()
         {
@@ -103,8 +112,11 @@ namespace ACT_Adder
         public void DeInitPlugin()
         {
             ActGlobals.oFormActMain.OnLogLineRead -= OFormActMain_OnLogLineRead;
-            floatLoc = floater.Location.ToString();
-            floatSize = floater.Size.ToString();
+            if (floaterShown)
+            {
+                floatLoc = floater.Location.ToString();
+                floatSize = floater.Size.ToString();
+            }
             SaveSettings();
             lblStatus.Text = "Plugin Exited";
         }
@@ -114,6 +126,7 @@ namespace ACT_Adder
             lblStatus = pluginStatusText;           // Save the status label's reference
             pluginScreenSpace.Controls.Add(this);   // Add this UserControl to the tab ACT provides
             this.Dock = DockStyle.Fill;             // Expand the UserControl to fill the tab's client space
+
             xmlSettings = new SettingsSerializer(this); // Create a new settings serializer and pass it this instance
             LoadSettings();
             initializing = false;
@@ -125,9 +138,11 @@ namespace ACT_Adder
             floater.GeometryEvent += Floater_GeometryEvent;
             floater.ClearEvent += Floater_ClearEvent;
 
-            timeWindow = new TimeSpan(0, 0, 30);
-            
-            macroFile = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, "lab-macro.txt");
+            SetTimeWindow();
+
+            macroFilePath = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, shoutMacroFile);
+            curesFilePath = Path.Combine(ActGlobals.oFormActMain.GameMacroFolder, curesMacroFile);
+            SetMacroHelp();
 
             ActGlobals.oFormActMain.OnLogLineRead += OFormActMain_OnLogLineRead;
 
@@ -150,7 +165,7 @@ namespace ACT_Adder
                 vtask.Wait();
                 if (vtask.Result > localVersion)
                 {
-                    DialogResult result = MessageBox.Show("There is an updated version of the Adder Plugin.  Update it now?\n\n(If there is an update to ACT, you should click No and update ACT first.)", 
+                    DialogResult result = MessageBox.Show("There is an updated version of the Adder Plugin.\n\nSee the changes by clicking the About link in the plugin.\n\nUpdate it now?\n\n(If there is an update to ACT, you should click No and update ACT first.)", 
                         "New Version", MessageBoxButtons.YesNo, MessageBoxIcon.Question);
                     if (result == DialogResult.Yes)
                     {
@@ -161,6 +176,7 @@ namespace ACT_Adder
                             ActPluginData pluginData = ActGlobals.oFormActMain.PluginGetSelfData(this);
                             pluginData.pluginFile.Delete();
                             File.Move(ftask.Result.FullName, pluginData.pluginFile.FullName);
+                            Application.DoEvents();
                             ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, false);
                             Application.DoEvents();
                             ThreadInvokes.CheckboxSetChecked(ActGlobals.oFormActMain, pluginData.cbEnabled, true);
@@ -248,9 +264,16 @@ namespace ACT_Adder
                         Need.when = logInfo.detectedTime;
                         _synchronizationContext.Post(UpdateTarget, null);
                     }
+                    else
+                    {
+                        match = reWinStart.Match(logInfo.logLine);
+                        if (match.Success)
+                            _synchronizationContext.Send(StartCountdown, null);
+                    }
                 }
             }
         }
+
         void LoadSettings()
         {
             xmlSettings.AddControlSetting(textBoxSeconds.Name, textBoxSeconds);
@@ -302,21 +325,44 @@ namespace ACT_Adder
             xWriter.Close();
         }
 
+        private void SetMacroHelp()
+        {
+            dataGridView2.Rows.Add("cure players", "/do_file_commands " + curesMacroFile);
+            dataGridView2.Rows.Add("shout cures", "/do_file_commands " + shoutMacroFile);
+            dataGridView2.Columns[0].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
+            dataGridView2.Columns[1].AutoSizeMode = DataGridViewAutoSizeColumnMode.Fill;
+            // set the height of the dgv from the number of rows
+            int height = dataGridView2.ColumnHeadersHeight - 1;
+            foreach (DataGridViewRow dr in dataGridView2.Rows)
+            {
+                height += dr.Height;
+            }
+            dataGridView2.Height = height;
+        }
+
+        // UI thread
+        void StartCountdown(object o)
+        {
+            ActGlobals.oFormActMain.SendToMacroFile(macroFilePath, undeterminedCure, "say ");
+            ActGlobals.oFormActMain.SendToMacroFile(curesFilePath, undeterminedCure, "g");
+            progressControl1.StartProgress();
+            floater.StartProgress();
+        }
+
         // UI thread
         void UpdatePlayer(object o)
         {
             Player p = o as Player;
             if(p != null)
             {
-                //remove old need
                 DateTime start = p.when - timeWindow;
+                //remove old need?
                 if (Need.when < start && !string.IsNullOrEmpty(textBoxCures.Text))
                 {
                     textBoxTarget.Text = string.Empty;
                     floater.SetNeed(string.Empty);
                     textBoxCures.Text = string.Empty;
                     floater.SetCure(string.Empty);
-                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
                 }
 
                 // update player
@@ -330,12 +376,7 @@ namespace ACT_Adder
                     dataGridView1.Columns["when"].DefaultCellStyle.Format = "T";
                     dataGridView1.Columns["when"].AutoSizeMode = DataGridViewAutoSizeColumnMode.AllCells;
                     if(checkBoxPop.Checked && floater.Visible == false)
-                    {
-                        floater.Show();
-                        floater.Location = StringToPoint(floatLoc);
-                        floater.Size = StringToSize(floatSize);
-                        floater.TopMost = true;
-                    }
+                        ShowFloater();
                 }
                 else
                 {
@@ -357,16 +398,25 @@ namespace ACT_Adder
             }
         }
 
+        private void ShowFloater()
+        {
+            floater.Show();
+            floaterShown = true;
+            floater.Location = StringToPoint(floatLoc);
+            floater.Size = StringToSize(floatSize);
+            floater.TopMost = true;
+        }
+
         // UI thread
         void UpdateTarget(object o)
         {
             mostRecent = Need.when;
             textBoxTarget.Text = Need.count;
             floater.SetNeed(Need.count);
-            if (!string.IsNullOrEmpty(textBoxCures.Text))
-                ActGlobals.oFormActMain.SendToMacroFile(macroFile, "cure not available", "say ");
             textBoxCures.Text = string.Empty;
             floater.SetCure(string.Empty);
+            if (checkBoxPop.Checked && floater.Visible == false)
+                ShowFloater();
             SearchForTarget();
         }
 
@@ -387,12 +437,12 @@ namespace ACT_Adder
                     {
                         int outerCount = gridData_[i].IntCount();
                         if (gridData_[i].when < start || outerCount == 0)
-                            continue;
+                            continue; // skip anyone who has not reported
                         for(int j=i+1; j<playerCount; j++)
                         {
                             int innerCount = gridData_[j].IntCount();
                             if (gridData_[j].when < start || innerCount == 0)
-                                continue;
+                                continue; // skip anyone who has not reported
                             if (innerCount + outerCount == added)
                             {
                                 //found a match
@@ -410,7 +460,11 @@ namespace ACT_Adder
                                         ActGlobals.oFormActMain.TTS(cure);
                                     announced = mostRecent;
                                     announcedTotal = added;
-                                    ActGlobals.oFormActMain.SendToMacroFile(macroFile, cure, "shout ");
+                                    ActGlobals.oFormActMain.SendToMacroFile(macroFilePath, cure, "shout ");
+                                    ActGlobals.oFormActMain.SendToMacroFile(curesFilePath, 
+                                        "cancel_spellcast" + Environment.NewLine
+                                        + string.Format(cureFormat, p1, p1) + Environment.NewLine 
+                                        + string.Format(cureFormat, p2, p2), "");
                                 }
                                 break;
                             }
@@ -429,18 +483,27 @@ namespace ACT_Adder
             floater.SetCure(string.Empty);
             textBoxTarget.Text = string.Empty;
             floater.SetNeed(string.Empty);
+            progressControl1.ClearProgress();
+            floater.StopProgress();
         }
 
         private void textBoxSeconds_TextChanged(object sender, EventArgs e)
         {
             if (!initializing)
             {
-                int secs;
-                if (!int.TryParse(textBoxSeconds.Text, out secs))
-                    secs = 20;
-                timeWindow = new TimeSpan(0, 0, secs);
+                SetTimeWindow();
                 SaveSettings();
             }
+        }
+
+        private void SetTimeWindow()
+        {
+            int secs;
+            if (!int.TryParse(textBoxSeconds.Text, out secs))
+                secs = 30;
+            timeWindow = new TimeSpan(0, 0, secs);
+            progressControl1.ProgressMaximum = secs;
+            floater.SetProgressMax(secs);
         }
 
         private void textBoxTarget_Leave(object sender, EventArgs e)
@@ -520,10 +583,7 @@ namespace ACT_Adder
                 {
                     if (floater.Visible == false)
                     {
-                        floater.Show();
-                        floater.Location = StringToPoint(floatLoc);
-                        floater.Size = StringToSize(floatSize);
-                        floater.TopMost = true;
+                        ShowFloater();
                     }
                 }
             }
@@ -544,6 +604,7 @@ namespace ACT_Adder
         private void Floater_ClearEvent(object sender, EventArgs e)
         {
             buttonClear_Click(sender, e);
+            progressControl1.ClearProgress();
         }
 
         private void dataGridView1_CellFormatting(object sender, DataGridViewCellFormattingEventArgs e)
@@ -577,6 +638,8 @@ namespace ACT_Adder
         {
             this.components = new System.ComponentModel.Container();
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle2 = new System.Windows.Forms.DataGridViewCellStyle();
+            System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle3 = new System.Windows.Forms.DataGridViewCellStyle();
             this.label1 = new System.Windows.Forms.Label();
             this.textBoxTarget = new System.Windows.Forms.TextBox();
             this.label2 = new System.Windows.Forms.Label();
@@ -589,7 +652,15 @@ namespace ACT_Adder
             this.linkLabel1 = new System.Windows.Forms.LinkLabel();
             this.checkBoxPop = new System.Windows.Forms.CheckBox();
             this.toolTip1 = new System.Windows.Forms.ToolTip(this.components);
+            this.progressControl1 = new ACT_Adder.ProgressControl();
+            this.dataGridView2 = new System.Windows.Forms.DataGridView();
+            this.Purpose = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.Command = new System.Windows.Forms.DataGridViewTextBoxColumn();
+            this.label5 = new System.Windows.Forms.Label();
+            this.label6 = new System.Windows.Forms.Label();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).BeginInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView2)).BeginInit();
             this.SuspendLayout();
             // 
             // label1
@@ -632,7 +703,7 @@ namespace ACT_Adder
             this.buttonClear.Location = new System.Drawing.Point(164, 268);
             this.buttonClear.Name = "buttonClear";
             this.buttonClear.Size = new System.Drawing.Size(75, 23);
-            this.buttonClear.TabIndex = 7;
+            this.buttonClear.TabIndex = 8;
             this.buttonClear.Text = "Clear";
             this.toolTip1.SetToolTip(this.buttonClear, "Clear the current data");
             this.buttonClear.UseVisualStyleBackColor = true;
@@ -657,7 +728,7 @@ namespace ACT_Adder
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.Size = new System.Drawing.Size(399, 210);
-            this.dataGridView1.TabIndex = 8;
+            this.dataGridView1.TabIndex = 11;
             this.dataGridView1.TabStop = false;
             this.dataGridView1.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridView1_CellFormatting);
             // 
@@ -669,12 +740,13 @@ namespace ACT_Adder
             this.label3.Size = new System.Drawing.Size(34, 13);
             this.label3.TabIndex = 2;
             this.label3.Text = "within";
+            this.label3.TextAlign = System.Drawing.ContentAlignment.TopRight;
             // 
             // textBoxSeconds
             // 
-            this.textBoxSeconds.Location = new System.Drawing.Point(166, 216);
+            this.textBoxSeconds.Location = new System.Drawing.Point(164, 216);
             this.textBoxSeconds.Name = "textBoxSeconds";
-            this.textBoxSeconds.Size = new System.Drawing.Size(47, 20);
+            this.textBoxSeconds.Size = new System.Drawing.Size(36, 20);
             this.textBoxSeconds.TabIndex = 3;
             this.textBoxSeconds.Text = "30";
             this.textBoxSeconds.TextAlign = System.Windows.Forms.HorizontalAlignment.Center;
@@ -683,7 +755,7 @@ namespace ACT_Adder
             // label4
             // 
             this.label4.AutoSize = true;
-            this.label4.Location = new System.Drawing.Point(219, 219);
+            this.label4.Location = new System.Drawing.Point(204, 219);
             this.label4.Name = "label4";
             this.label4.Size = new System.Drawing.Size(47, 13);
             this.label4.TabIndex = 4;
@@ -704,17 +776,94 @@ namespace ACT_Adder
             // checkBoxPop
             // 
             this.checkBoxPop.AutoSize = true;
+            this.checkBoxPop.Checked = true;
+            this.checkBoxPop.CheckState = System.Windows.Forms.CheckState.Checked;
             this.checkBoxPop.Location = new System.Drawing.Point(337, 244);
             this.checkBoxPop.Name = "checkBoxPop";
             this.checkBoxPop.Size = new System.Drawing.Size(57, 17);
-            this.checkBoxPop.TabIndex = 10;
+            this.checkBoxPop.TabIndex = 7;
             this.checkBoxPop.Text = "Popup";
             this.toolTip1.SetToolTip(this.checkBoxPop, "Check to show pop-up window");
             this.checkBoxPop.UseVisualStyleBackColor = true;
             this.checkBoxPop.CheckedChanged += new System.EventHandler(this.checkBoxPop_CheckedChanged);
             // 
+            // progressControl1
+            // 
+            this.progressControl1.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.progressControl1.Location = new System.Drawing.Point(258, 217);
+            this.progressControl1.Name = "progressControl1";
+            this.progressControl1.ProgressMaximum = 30;
+            this.progressControl1.ProgressMinimum = 0;
+            this.progressControl1.ProgressValue = 0;
+            this.progressControl1.Size = new System.Drawing.Size(141, 20);
+            this.progressControl1.TabIndex = 11;
+            this.progressControl1.TabStop = false;
+            this.toolTip1.SetToolTip(this.progressControl1, "Time remaining in the current cycle");
+            // 
+            // dataGridView2
+            // 
+            this.dataGridView2.AllowUserToAddRows = false;
+            this.dataGridView2.AllowUserToDeleteRows = false;
+            this.dataGridView2.AllowUserToResizeRows = false;
+            dataGridViewCellStyle2.Alignment = System.Windows.Forms.DataGridViewContentAlignment.MiddleLeft;
+            dataGridViewCellStyle2.BackColor = System.Drawing.SystemColors.GradientInactiveCaption;
+            dataGridViewCellStyle2.Font = new System.Drawing.Font("Microsoft Sans Serif", 8.25F, System.Drawing.FontStyle.Regular, System.Drawing.GraphicsUnit.Point, ((byte)(0)));
+            dataGridViewCellStyle2.ForeColor = System.Drawing.SystemColors.WindowText;
+            dataGridViewCellStyle2.Padding = new System.Windows.Forms.Padding(1);
+            dataGridViewCellStyle2.SelectionBackColor = System.Drawing.SystemColors.Highlight;
+            dataGridViewCellStyle2.SelectionForeColor = System.Drawing.SystemColors.HighlightText;
+            dataGridViewCellStyle2.WrapMode = System.Windows.Forms.DataGridViewTriState.True;
+            this.dataGridView2.ColumnHeadersDefaultCellStyle = dataGridViewCellStyle2;
+            this.dataGridView2.ColumnHeadersHeightSizeMode = System.Windows.Forms.DataGridViewColumnHeadersHeightSizeMode.AutoSize;
+            this.dataGridView2.Columns.AddRange(new System.Windows.Forms.DataGridViewColumn[] {
+            this.Purpose,
+            this.Command});
+            this.dataGridView2.EnableHeadersVisualStyles = false;
+            this.dataGridView2.Location = new System.Drawing.Point(9, 337);
+            this.dataGridView2.Name = "dataGridView2";
+            this.dataGridView2.ReadOnly = true;
+            this.dataGridView2.RowHeadersVisible = false;
+            this.dataGridView2.Size = new System.Drawing.Size(385, 89);
+            this.dataGridView2.TabIndex = 10;
+            // 
+            // Purpose
+            // 
+            dataGridViewCellStyle3.SelectionBackColor = System.Drawing.Color.White;
+            dataGridViewCellStyle3.SelectionForeColor = System.Drawing.Color.Black;
+            this.Purpose.DefaultCellStyle = dataGridViewCellStyle3;
+            this.Purpose.HeaderText = "Purpose";
+            this.Purpose.Name = "Purpose";
+            this.Purpose.ReadOnly = true;
+            // 
+            // Command
+            // 
+            this.Command.HeaderText = "EQII Command (can be placed in a macro)";
+            this.Command.Name = "Command";
+            this.Command.ReadOnly = true;
+            // 
+            // label5
+            // 
+            this.label5.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.label5.Location = new System.Drawing.Point(2, 312);
+            this.label5.Name = "label5";
+            this.label5.Size = new System.Drawing.Size(390, 2);
+            this.label5.TabIndex = 12;
+            // 
+            // label6
+            // 
+            this.label6.AutoSize = true;
+            this.label6.Location = new System.Drawing.Point(10, 318);
+            this.label6.Name = "label6";
+            this.label6.Size = new System.Drawing.Size(241, 13);
+            this.label6.TabIndex = 13;
+            this.label6.Text = "EQII commands created when a solution is found:";
+            // 
             // Adder
             // 
+            this.Controls.Add(this.label6);
+            this.Controls.Add(this.label5);
+            this.Controls.Add(this.dataGridView2);
+            this.Controls.Add(this.progressControl1);
             this.Controls.Add(this.checkBoxPop);
             this.Controls.Add(this.linkLabel1);
             this.Controls.Add(this.label4);
@@ -727,8 +876,10 @@ namespace ACT_Adder
             this.Controls.Add(this.textBoxTarget);
             this.Controls.Add(this.label1);
             this.Name = "Adder";
-            this.Size = new System.Drawing.Size(402, 305);
+            this.Size = new System.Drawing.Size(402, 470);
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).EndInit();
+            ((System.ComponentModel.ISupportInitialize)(this.dataGridView2)).EndInit();
             this.ResumeLayout(false);
             this.PerformLayout();
 
@@ -746,6 +897,12 @@ namespace ACT_Adder
         private CheckBox checkBoxPop;
         private ToolTip toolTip1;
         private System.ComponentModel.IContainer components;
+        private ProgressControl progressControl1;
+        private DataGridView dataGridView2;
+        private Label label5;
+        private Label label6;
+        private DataGridViewTextBoxColumn Purpose;
+        private DataGridViewTextBoxColumn Command;
     }
 }
 
@@ -856,6 +1013,21 @@ namespace ACT_Adder
                 this.Text = "Adder - need " + txt;
         }
 
+        public void SetProgressMax(int seconds)
+        {
+            progressControl1.ProgressMaximum = seconds;
+        }
+
+        public void StartProgress()
+        {
+            progressControl1.StartProgress();
+        }
+
+        public void StopProgress()
+        {
+            progressControl1.ClearProgress();
+        }
+
         // save changes to size/loc by telling the main form about them
         private void Floater_ResizeEnd(object sender, EventArgs e)
         {
@@ -869,6 +1041,7 @@ namespace ACT_Adder
         // tell the main form to clear the data
         private void textBoxCure_ClickX(object sender, EventArgs e)
         {
+            progressControl1.ClearProgress();
             if (ClearEvent != null)
                 ClearEvent.Invoke(this, new EventArgs());
         }
@@ -890,6 +1063,7 @@ namespace ACT_Adder
                 }
             }
         }
+
     }
 }
 
@@ -930,10 +1104,12 @@ namespace ACT_Adder
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.panel2 = new System.Windows.Forms.Panel();
+            this.progressControl1 = new ACT_Adder.ProgressControl();
             this.textBoxCure = new ACT_Adder.TextBoxX();
+            this.panel2 = new System.Windows.Forms.Panel();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).BeginInit();
             this.panel2.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -958,28 +1134,34 @@ namespace ACT_Adder
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersVisible = false;
-            this.dataGridView1.Size = new System.Drawing.Size(166, 165);
+            this.dataGridView1.Size = new System.Drawing.Size(159, 141);
             this.dataGridView1.TabIndex = 0;
             this.dataGridView1.TabStop = false;
             this.dataGridView1.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridView1_CellFormatting);
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.progressControl1);
             this.panel1.Controls.Add(this.textBoxCure);
             this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(166, 20);
+            this.panel1.Size = new System.Drawing.Size(159, 44);
             this.panel1.TabIndex = 2;
             // 
-            // panel2
+            // progressControl1
             // 
-            this.panel2.Controls.Add(this.dataGridView1);
-            this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panel2.Location = new System.Drawing.Point(0, 20);
-            this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(166, 165);
-            this.panel2.TabIndex = 3;
+            this.progressControl1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.progressControl1.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.progressControl1.Location = new System.Drawing.Point(3, 21);
+            this.progressControl1.Name = "progressControl1";
+            this.progressControl1.ProgressMaximum = 30;
+            this.progressControl1.ProgressMinimum = 0;
+            this.progressControl1.ProgressValue = 0;
+            this.progressControl1.Size = new System.Drawing.Size(153, 20);
+            this.progressControl1.TabIndex = 1;
+            this.progressControl1.TabStop = false;
             // 
             // textBoxCure
             // 
@@ -989,16 +1171,25 @@ namespace ACT_Adder
             this.textBoxCure.Location = new System.Drawing.Point(0, 0);
             this.textBoxCure.Name = "textBoxCure";
             this.textBoxCure.ReadOnly = true;
-            this.textBoxCure.Size = new System.Drawing.Size(166, 20);
+            this.textBoxCure.Size = new System.Drawing.Size(159, 20);
             this.textBoxCure.TabIndex = 0;
             this.textBoxCure.TabStop = false;
             this.textBoxCure.ClickX += new System.EventHandler(this.textBoxCure_ClickX);
+            // 
+            // panel2
+            // 
+            this.panel2.Controls.Add(this.dataGridView1);
+            this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel2.Location = new System.Drawing.Point(0, 44);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(159, 141);
+            this.panel2.TabIndex = 3;
             // 
             // Floater
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(166, 185);
+            this.ClientSize = new System.Drawing.Size(159, 185);
             this.Controls.Add(this.panel2);
             this.Controls.Add(this.panel1);
             this.MaximizeBox = false;
@@ -1013,6 +1204,7 @@ namespace ACT_Adder
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).EndInit();
             this.panel2.ResumeLayout(false);
             this.ResumeLayout(false);
 
@@ -1024,6 +1216,7 @@ namespace ACT_Adder
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel panel2;
         private TextBoxX textBoxCure;
+        private ProgressControl progressControl1;
     }
 }
 #endregion Floater.Designer.cs
@@ -1132,3 +1325,158 @@ namespace ACT_Adder
 }
 
 #endregion TextBoxX.Designer.cs
+
+#region ProgressControl.cs
+
+namespace ACT_Adder
+{
+    // Progress bar that counts down from ProgressMaximum to ProgressMinimum
+    // at one count per second.
+    public partial class ProgressControl : PictureBox
+    {
+        System.Timers.Timer timer = new System.Timers.Timer();
+        
+        [Browsable(true)]
+        [Category("Design")]
+        [Description("Minimum value")]
+        public int ProgressMinimum { get { return progressMinimum_; } set { progressMinimum_ = value; } }
+        private int progressMinimum_ = 0;
+
+        [Browsable(true)]
+        [Category("Design")]
+        [Description("Maximum value")]
+        public int ProgressMaximum { get { return progressMaximum_; } set { progressMaximum_ = value; } }
+        private int progressMaximum_ = 30;
+
+        [Browsable(true)]
+        [Category("Design")]
+        [Description("Current value")]
+        public int ProgressValue { 
+            get { return progressValue_; } 
+            set 
+            {
+                progressValue_ = value; 
+                Refresh();
+                if(!timer.Enabled)
+                {
+                    timer.Enabled = true;
+                    timer.Start();
+                }
+            } 
+        }
+        private int progressValue_ = 0;
+
+        // required by PictureBox
+        public AutoScaleMode AutoScaleMode;
+
+        public ProgressControl()
+        {
+            InitializeComponent();
+
+            Paint += ProgressControl_Paint;
+
+            timer.Elapsed += Timer_Elapsed;
+            timer.SynchronizingObject = this;
+            timer.Interval = 1000;
+            timer.Enabled = false;
+        }
+
+        public void StartProgress()
+        {
+            progressValue_ = progressMaximum_;
+            Refresh();
+            if (!timer.Enabled)
+            {
+                timer.Enabled = true;
+                timer.Start();
+            }
+        }
+
+        public void ClearProgress()
+        {
+            if(progressValue_ > progressMinimum_)
+                progressValue_ = 1;
+        }
+
+        private void Timer_Elapsed(object sender, System.Timers.ElapsedEventArgs e)
+        {
+            if (progressValue_ > progressMinimum_)
+            {
+                progressValue_--;
+                Refresh();
+            }
+        }
+
+        private void ProgressControl_Paint(object sender, PaintEventArgs e)
+        {
+            // Clear everything
+            e.Graphics.Clear(BackColor);
+
+            // Draw the progress bar.
+            float fraction =
+                (float)(ProgressValue - ProgressMinimum) /
+                (ProgressMaximum - ProgressMinimum);
+            int wid = (int)(fraction * ClientSize.Width);
+            e.Graphics.FillRectangle(
+                Brushes.LightGreen, 0, 0, wid,
+                ClientSize.Height);
+
+            // Draw the text.
+            e.Graphics.TextRenderingHint =
+                TextRenderingHint.AntiAliasGridFit;
+            using (StringFormat sf = new StringFormat())
+            {
+                sf.Alignment = StringAlignment.Center;
+                sf.LineAlignment = StringAlignment.Center;
+                e.Graphics.DrawString(
+                    ProgressValue.ToString(),
+                    this.Font, Brushes.Black,
+                    ClientRectangle, sf);
+            }
+        }
+    }
+}
+
+#endregion ProgressControl.cs
+
+#region ProgressControl.Designer.cs
+
+namespace ACT_Adder
+{
+    partial class ProgressControl
+    {
+        /// <summary> 
+        /// Required designer variable.
+        /// </summary>
+        private System.ComponentModel.IContainer components = null;
+
+        /// <summary> 
+        /// Clean up any resources being used.
+        /// </summary>
+        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && (components != null))
+            {
+                components.Dispose();
+            }
+            base.Dispose(disposing);
+        }
+
+        #region Component Designer generated code
+
+        /// <summary> 
+        /// Required method for Designer support - do not modify 
+        /// the contents of this method with the code editor.
+        /// </summary>
+        private void InitializeComponent()
+        {
+            components = new System.ComponentModel.Container();
+            this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
+        }
+
+        #endregion
+    }
+}
+
+#endregion ProgressControl.Designer.cs

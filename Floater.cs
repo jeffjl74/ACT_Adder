@@ -1,6 +1,7 @@
 ﻿using System;
 using System.ComponentModel;
 using System.Drawing;
+using System.Drawing.Text;
 using System.Windows.Forms;
 
 namespace ACT_Adder
@@ -56,6 +57,21 @@ namespace ACT_Adder
                 this.Text = "Adder - need " + txt;
         }
 
+        public void SetProgressMax(int seconds)
+        {
+            progressControl1.ProgressMaximum = seconds;
+        }
+
+        public void StartProgress()
+        {
+            progressControl1.StartProgress();
+        }
+
+        public void StopProgress()
+        {
+            progressControl1.ClearProgress();
+        }
+
         // save changes to size/loc by telling the main form about them
         private void Floater_ResizeEnd(object sender, EventArgs e)
         {
@@ -69,6 +85,7 @@ namespace ACT_Adder
         // tell the main form to clear the data
         private void textBoxCure_ClickX(object sender, EventArgs e)
         {
+            progressControl1.ClearProgress();
             if (ClearEvent != null)
                 ClearEvent.Invoke(this, new EventArgs());
         }
@@ -90,5 +107,6 @@ namespace ACT_Adder
                 }
             }
         }
+
     }
 }

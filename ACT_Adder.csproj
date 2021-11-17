@@ -59,6 +59,12 @@
       <DependentUpon>Floater.cs</DependentUpon>
     </Compile>
     <Compile Include="Player.cs" />
+    <Compile Include="ProgressControl.cs">
+      <SubType>Component</SubType>
+    </Compile>
+    <Compile Include="ProgressControl.Designer.cs">
+      <DependentUpon>ProgressControl.cs</DependentUpon>
+    </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="TextBoxX.cs">
       <SubType>Component</SubType>

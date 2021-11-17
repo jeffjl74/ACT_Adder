@@ -32,10 +32,12 @@ namespace ACT_Adder
             System.Windows.Forms.DataGridViewCellStyle dataGridViewCellStyle1 = new System.Windows.Forms.DataGridViewCellStyle();
             this.dataGridView1 = new System.Windows.Forms.DataGridView();
             this.panel1 = new System.Windows.Forms.Panel();
-            this.panel2 = new System.Windows.Forms.Panel();
+            this.progressControl1 = new ACT_Adder.ProgressControl();
             this.textBoxCure = new ACT_Adder.TextBoxX();
+            this.panel2 = new System.Windows.Forms.Panel();
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).BeginInit();
             this.panel1.SuspendLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).BeginInit();
             this.panel2.SuspendLayout();
             this.SuspendLayout();
             // 
@@ -60,28 +62,34 @@ namespace ACT_Adder
             this.dataGridView1.Name = "dataGridView1";
             this.dataGridView1.ReadOnly = true;
             this.dataGridView1.RowHeadersVisible = false;
-            this.dataGridView1.Size = new System.Drawing.Size(166, 165);
+            this.dataGridView1.Size = new System.Drawing.Size(159, 141);
             this.dataGridView1.TabIndex = 0;
             this.dataGridView1.TabStop = false;
             this.dataGridView1.CellFormatting += new System.Windows.Forms.DataGridViewCellFormattingEventHandler(this.dataGridView1_CellFormatting);
             // 
             // panel1
             // 
+            this.panel1.Controls.Add(this.progressControl1);
             this.panel1.Controls.Add(this.textBoxCure);
             this.panel1.Dock = System.Windows.Forms.DockStyle.Top;
             this.panel1.Location = new System.Drawing.Point(0, 0);
             this.panel1.Name = "panel1";
-            this.panel1.Size = new System.Drawing.Size(166, 20);
+            this.panel1.Size = new System.Drawing.Size(159, 44);
             this.panel1.TabIndex = 2;
             // 
-            // panel2
+            // progressControl1
             // 
-            this.panel2.Controls.Add(this.dataGridView1);
-            this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
-            this.panel2.Location = new System.Drawing.Point(0, 20);
-            this.panel2.Name = "panel2";
-            this.panel2.Size = new System.Drawing.Size(166, 165);
-            this.panel2.TabIndex = 3;
+            this.progressControl1.Anchor = ((System.Windows.Forms.AnchorStyles)(((System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Left) 
+            | System.Windows.Forms.AnchorStyles.Right)));
+            this.progressControl1.BorderStyle = System.Windows.Forms.BorderStyle.Fixed3D;
+            this.progressControl1.Location = new System.Drawing.Point(3, 21);
+            this.progressControl1.Name = "progressControl1";
+            this.progressControl1.ProgressMaximum = 30;
+            this.progressControl1.ProgressMinimum = 0;
+            this.progressControl1.ProgressValue = 0;
+            this.progressControl1.Size = new System.Drawing.Size(153, 20);
+            this.progressControl1.TabIndex = 1;
+            this.progressControl1.TabStop = false;
             // 
             // textBoxCure
             // 
@@ -91,16 +99,25 @@ namespace ACT_Adder
             this.textBoxCure.Location = new System.Drawing.Point(0, 0);
             this.textBoxCure.Name = "textBoxCure";
             this.textBoxCure.ReadOnly = true;
-            this.textBoxCure.Size = new System.Drawing.Size(166, 20);
+            this.textBoxCure.Size = new System.Drawing.Size(159, 20);
             this.textBoxCure.TabIndex = 0;
             this.textBoxCure.TabStop = false;
             this.textBoxCure.ClickX += new System.EventHandler(this.textBoxCure_ClickX);
+            // 
+            // panel2
+            // 
+            this.panel2.Controls.Add(this.dataGridView1);
+            this.panel2.Dock = System.Windows.Forms.DockStyle.Fill;
+            this.panel2.Location = new System.Drawing.Point(0, 44);
+            this.panel2.Name = "panel2";
+            this.panel2.Size = new System.Drawing.Size(159, 141);
+            this.panel2.TabIndex = 3;
             // 
             // Floater
             // 
             this.AutoScaleDimensions = new System.Drawing.SizeF(6F, 13F);
             this.AutoScaleMode = System.Windows.Forms.AutoScaleMode.Font;
-            this.ClientSize = new System.Drawing.Size(166, 185);
+            this.ClientSize = new System.Drawing.Size(159, 185);
             this.Controls.Add(this.panel2);
             this.Controls.Add(this.panel1);
             this.MaximizeBox = false;
@@ -115,6 +132,7 @@ namespace ACT_Adder
             ((System.ComponentModel.ISupportInitialize)(this.dataGridView1)).EndInit();
             this.panel1.ResumeLayout(false);
             this.panel1.PerformLayout();
+            ((System.ComponentModel.ISupportInitialize)(this.progressControl1)).EndInit();
             this.panel2.ResumeLayout(false);
             this.ResumeLayout(false);
 
@@ -126,5 +144,6 @@ namespace ACT_Adder
         private System.Windows.Forms.Panel panel1;
         private System.Windows.Forms.Panel panel2;
         private TextBoxX textBoxCure;
+        private ProgressControl progressControl1;
     }
 }

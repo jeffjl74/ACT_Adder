@@ -7,6 +7,7 @@ files = ['Properties\\AssemblyInfo.cs', 'Adder.cs', 'Adder.Designer.cs']
 files.extend(['Player.cs'])
 files.extend(['Floater.cs', 'Floater.Designer.cs'])
 files.extend(['TextBoxX.cs', 'TextBoxX.Designer.cs'])
+files.extend(['ProgressControl.cs', 'ProgressControl.Designer.cs'])
 
 merged = []
 usings = []
