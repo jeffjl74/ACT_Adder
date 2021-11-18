@@ -21,7 +21,7 @@ The plugin takes that information and generates
     * Be aware that this macro begins with a `/cancel_spellcast` to ensure that 
       the first cure is casted and the second cure is queued.
     * Since the second cure is queued while the first one casts,
-      do not cast anything else until after the second cure is done.
+      __do not cast anything else until after the second cure is done__.
       Casting anything else will cancel the second cure.
 
 
